@@ -1,0 +1,59 @@
+{% extends "kb/base.html" %}
+{% load static %}
+{% comment %}
+  Ticket pages reuse the KB's shell — header, brand, search, the
+  three-state auth block, footer — so the service reads as one
+  help centre on either hostname. Extending kb/base.html rather than
+  copying its header is the whole point of the {% block page_nav %} it
+  exposes: a second base template carrying its own copy of that header
+  would drift out of sync with this one the first time the auth block
+  changed.
+
+  The desk's own row of controls goes into page_nav (a full-bleed strip
+  directly under the site header), and each page's body into the
+  ordinary content block.
+
+  Login-required and private: noindex here, and kb/views.py::robots_txt
+  disallows /tickets/ as well. meta_description is blanked because
+  kb/base.html emits the tag unconditionally and there is nothing
+  useful (or public) to put in it.
+{% endcomment %}
+{% block meta_description %}{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="{% static 'tickets/css/tickets.css' %}">
+{% endblock %}
+
+{% block page_nav %}
+<div class="tickets-nav">
+  <nav class="wrap tickets-tabs" aria-label="Tickets">
+    {% with nav=request.resolver_match.url_name %}
+    <a href="{% url 'tickets:list' %}" class="{% if nav == 'list' or nav == 'detail' or nav == 'reply' or nav == 'update' %}active{% endif %}">Open</a>
+    <a href="{% url 'tickets:resolved' %}" class="{% if nav == 'resolved' %}active{% endif %}">Resolved</a>
+    {% comment %}
+      "Raise a ticket" is customer-only (views.py::ticket_create refuses
+      an is_staff account with a 403), so hide it from support agents
+      rather than offering a tab that always errors.
+    {% endcomment %}
+    {% if not request.user.is_staff %}
+    <a href="{% url 'tickets:create' %}" class="{% if nav == 'create' %}active{% endif %}">Raise a ticket</a>
+    {% endif %}
+    {% endwith %}
+  </nav>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="tickets-page">
+  {% block tickets_content %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_body %}
+{% comment %}
+  Same htmx build (and integrity hash) as kb/article_detail.html's
+  rating widget, and the only remote script host
+  support_core/security_middleware.py's CSP allows.
+{% endcomment %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js" integrity="sha512-LDpwGAr1u1Ec+HYCHhQpUcAxwyHK4khBmxk5AAOJfrOFy9UifQR7t7CjP1YFmC3Jc4Vp4TQGQrs8xTOKzoxSaA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+{% endblock %}

@@ -1,0 +1,448 @@
+/* SL Deskline's KB — minimal, fast-loading base styles. Deliberately no
+   build step (no Sass/PostCSS/bundler) — matches the rest of this
+   service's "no separate frontend" architecture.
+
+   --accent (and its -dark/-light/-tint shades below) is this
+   deployment's brand colour. The literal value here is only ever the
+   *fallback*: kb/templates/kb/base.html writes the self-hoster's own
+   choice (branding.SiteSettings.accent_color) into the same custom
+   property as an inline `style="--accent: ...;"` on <html>, which wins
+   the cascade over this stylesheet rule for every page that renders
+   through that template. #7c3aed is that field's own default, so a
+   fresh install with SiteSettings untouched renders pixel-identical to
+   this stylesheet alone -- see branding/models.py.
+
+   -dark/-light/-tint are derived from --accent with color-mix() rather
+   than hard-coded, so a self-hoster's custom accent gets matching
+   hover/focus-ring/tint shades too instead of the default purple ones
+   leaking through underneath a green or blue accent. The mix
+   percentages were chosen to land close to this stylesheet's own
+   previous hard-coded shades for the #7c3aed default:
+     -dark:  color-mix(#7c3aed, 75% black) = #5d2cb2 (was #5b21b6)
+     -light: color-mix(#7c3aed, 60% white) = #b089f4 (was #a78bfa)
+     -tint:  color-mix(#7c3aed, 6% white)  = #f7f3fe (was #f5f3ff)
+   All three are declared here on :root, which is <html> -- the same
+   element the inline style attribute sets --accent on -- so var(--accent)
+   inside each color-mix() resolves against the self-hoster's own colour,
+   not the fallback above, on every page.
+
+   --brand-mark (#2D1B6B) is a separate, fixed dark shade used only for
+   the authoring sidebar background and header wordmark colour -- not
+   part of the configurable accent, and not used for links or buttons. */
+:root {
+  --accent: #7c3aed;
+  --accent-dark: color-mix(in srgb, var(--accent) 75%, black);
+  --accent-light: color-mix(in srgb, var(--accent) 60%, white);
+  --accent-tint: color-mix(in srgb, var(--accent) 6%, white);
+  --brand-mark: #2D1B6B;   /* brand mark only — see note above */
+  --ink: #2c3e50;                   /* --text-dark over there */
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --bg: #f5f5f7;
+  --card-bg: #ffffff;
+  --success: #16a34a;
+  --success-tint: #ecfdf3;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 2px 16px rgba(124, 58, 237, 0.12);
+  --shadow-hover: 0 4px 20px rgba(124, 58, 237, 0.2);
+}
+* { box-sizing: border-box; }
+html { height: 100%; }
+body {
+  margin: 0;
+  min-height: 100%;
+  /* Sticky footer: body is a column flex container so .site-footer sits
+     at the bottom of the viewport (not right after whatever content
+     happens to be on the page) even when a page is shorter than the
+     screen — e.g. the new-article form, or an article list with only a
+     couple of results. .site-main (flex: 1 0 auto, below) is what
+     actually absorbs the extra space; header/footer keep their natural
+     height (flex-shrink: 0). The footer itself only renders for
+     anonymous visitors (kb/templates/kb/base.html) -- this layout still
+     holds up fine for a signed-in author's footer-less pages too, since
+     .site-main just absorbs the extra space either way. */
+  display: flex;
+  flex-direction: column;
+  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; }
+a { color: var(--accent); }
+
+/* Header: 1200px max-width, 2rem side padding, 64px minimum height, sticky,
+   with the shared shadow token -- deliberately wider than the 960px
+   body-copy .wrap, which reads as cramped for a full-width nav bar. */
+/* flex: 1 0 auto is the other half of the sticky-footer trick above --
+   absorbs the leftover viewport height so .site-footer never floats
+   above the bottom of the screen on a short page. */
+.site-main { flex: 1 0 auto; }
+
+.site-header { background: var(--card-bg); box-shadow: var(--shadow); position: sticky; top: 0; z-index: 200; flex-shrink: 0; }
+.site-header .wrap {
+  max-width: 1200px; padding: 0.75rem 2rem; min-height: 64px;
+  display: flex; align-items: center; gap: 0.75rem 2rem; flex-wrap: wrap;
+}
+/* Only the search box may shrink -- everything else keeps its natural
+   width, so a long user name + organisation list in the auth block
+   can't squeeze the search form into overlapping the brand. min-height
+   (not height) lets the row wrap cleanly instead of spilling out. */
+.site-header .wrap > :not(.search-form) { flex-shrink: 0; }
+.brand { font-weight: 700; font-size: 1.2rem; color: var(--brand-mark); text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; }
+/* branding.SiteSettings.logo, when set, replaces the text brand
+   entirely (kb/templates/kb/base.html) -- capped to the header's own
+   height so an arbitrarily large upload never grows the header. */
+.brand-logo { max-height: 32px; width: auto; display: block; }
+.search-form { flex: 1; min-width: 200px; display: flex; gap: 8px; }
+.search-form input {
+  flex: 1; min-width: 0; padding: 9px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 0.95rem; background: var(--bg); transition: border-color 0.15s, background 0.15s;
+}
+.search-form input:focus {
+  outline: none; border-color: var(--accent); background: var(--card-bg);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.search-form button {
+  padding: 9px 16px; border: none; background: var(--accent); color: #fff;
+  border-radius: var(--radius-sm); font-family: inherit; font-weight: 500; font-size: 0.95rem; cursor: pointer;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.search-form button:hover { background: var(--accent-dark); }
+.cta { white-space: nowrap; color: var(--accent); font-weight: 600; text-decoration: none; }
+.cta:hover { color: var(--accent-dark); }
+
+/* .btn-nav / .nav-auth / .nav-username — the header's Log in / Tickets /
+   Log out controls. */
+.nav-auth { display: flex; align-items: center; gap: 0.75rem; }
+.nav-username { font-size: 0.9rem; color: var(--ink); opacity: 0.75; white-space: nowrap; }
+.btn-nav {
+  background: var(--accent); color: #fff; border: none; padding: 0.45rem 1.1rem;
+  border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none;
+  display: inline-block; white-space: nowrap; transition: background 0.15s;
+}
+.btn-nav:hover { background: var(--accent-dark); }
+/* Log out has to POST (accounts:logout is @require_POST), so it is a
+   <form> sitting among inline controls. `display: contents` lets the
+   .nav-auth flex row lay the button out as if the form weren't there,
+   so it lines up exactly like the neighbouring links. */
+.nav-auth-logout-form { display: contents; margin: 0; }
+
+.hero { padding: 44px 0 24px; }
+.hero h1 { margin: 0 0 10px; font-size: 2rem; color: var(--ink); }
+.hero p { color: var(--muted); font-size: 1.05rem; margin: 0; }
+
+.filters form { display: flex; gap: 14px; flex-wrap: wrap; margin: 24px 0; }
+.filters label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); font-weight: 500; }
+.filters select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 0.9rem; background: var(--card-bg); color: var(--ink); cursor: pointer;
+}
+.filters select:focus { outline: none; border-color: var(--accent); }
+
+.featured-article h2 { margin-bottom: 12px; }
+
+.article-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 20px 0 44px; }
+.article-card {
+  display: block; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius);
+  text-decoration: none; color: inherit; background: var(--card-bg); box-shadow: var(--shadow);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.article-card:hover { border-color: var(--accent-light); box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.article-card h3 { margin: 8px 0 6px; font-size: 1.05rem; color: var(--ink); }
+.article-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.article-card .badge {
+  display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--accent-dark); font-weight: 700; background: var(--accent-tint);
+  padding: 3px 9px; border-radius: 999px;
+}
+.article-card .meta { display: block; margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
+.article-card.featured { background: var(--accent-tint); border-color: var(--accent-light); }
+
+/* Home page: one section per category (kb/views.py::article_list). */
+.category-section { margin-top: 32px; }
+.category-section .article-grid { margin: 14px 0 0; }
+.category-section-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.category-section-title { margin: 0; font-size: 1.3rem; color: var(--ink); }
+.category-section-more { font-size: 0.9rem; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.category-section-more:hover { text-decoration: underline; }
+.category-section:last-of-type { margin-bottom: 44px; }
+.results-count { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+.article-detail .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
+.article-detail h1 { font-size: 1.75rem; margin: 0 0 8px; }
+.article-detail .byline { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
+.hero-photo { width: 100%; border-radius: var(--radius); margin: 16px 0; box-shadow: var(--shadow); }
+.summary, .body { font-size: 1rem; }
+.summary p, .body p { margin: 0 0 14px; }
+/* Inline article images (dropped/pasted into the Markdown editor —
+   kb/views.py::markdown_image_upload resizes the file itself, but
+   caps at 2000px on the long edge, which still comfortably overflows
+   the ~700px-wide reading column with nothing constraining *display*
+   size). Scoped to .body and .markdownx-preview rather than a global
+   `img` rule, since other image contexts on the site (.hero-photo,
+   .step-photos img, .showcase-card img) already size themselves
+   deliberately and shouldn't be second-guessed by a blanket rule.
+   .markdownx-preview gets the same treatment as .body since both
+   render the exact same Markdown through the exact same function
+   (kb/markdown_utils.py) — the editor preview is meant to be a true
+   preview, so an oversized image should look wrong in *both* places
+   or neither, not just on the published page. */
+.body img, .markdownx-preview img {
+  /* !important is deliberate and narrow here, not a specificity punt:
+     an author can now set style="width: 50%" (or any CSS width value —
+     see kb/markdown_utils.py's CSS_SANITIZER) via attr_list, and an
+     inline style attribute always wins the cascade over a stylesheet
+     rule regardless of selector specificity. bleach sanitises which
+     *properties* survive but not their *values* — nothing stops
+     someone writing width: 5000% — so this is the actual safety net
+     that keeps a bad value from ever overflowing the page horizontally,
+     not just a default. Deliberately not applied to height, which
+     can't break the page's width the same way. */
+  max-width: 100% !important;
+  height: auto;
+  display: block;
+  margin: 14px 0;
+  border-radius: var(--radius-sm);
+}
+.steps h2 { margin-bottom: 16px; }
+.steps ol { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+.steps li {
+  counter-increment: step; position: relative; padding: 4px 0 22px 40px; margin-bottom: 4px; border-left: 2px solid var(--border);
+}
+.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.steps li::before {
+  content: counter(step); position: absolute; left: -15px; top: 0; width: 30px; height: 30px;
+  background: var(--accent); color: #fff; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-weight: 700; font-size: 0.85rem;
+}
+.step-photos img { max-width: 240px; border-radius: var(--radius-sm); margin: 8px 8px 0 0; box-shadow: var(--shadow); }
+.tags { margin: 28px 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag {
+  display: inline-block; padding: 5px 12px; background: var(--accent-tint); border-radius: 999px;
+  font-size: 0.8rem; font-weight: 500; text-decoration: none; color: var(--accent-dark); border: 1px solid transparent;
+  transition: background 0.15s;
+}
+.tag:hover { background: var(--accent-light); color: #fff; }
+
+.rating-widget { margin: 32px 0; padding: 18px 20px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.rating-widget p { margin: 0 0 10px; font-weight: 500; color: var(--ink); }
+.rating-widget form { display: flex; gap: 10px; }
+.rating-widget button {
+  padding: 8px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card-bg);
+  font-family: inherit; font-weight: 500; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.rating-widget button:hover { border-color: var(--accent); background: var(--accent-tint); }
+.rating-thanks { color: var(--success); font-weight: 500; }
+
+.showcase-block {
+  margin: 44px 0; padding: 28px; border-radius: 16px; color: #fff;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+}
+.showcase-block h2 { margin-top: 0; color: #fff; }
+.showcase-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+.showcase-card {
+  display: block; background: rgba(255,255,255,0.1); border-radius: var(--radius); overflow: hidden;
+  text-decoration: none; color: #fff; transition: background 0.15s;
+}
+.showcase-card:hover { background: rgba(255,255,255,0.18); }
+.showcase-card img { width: 100%; display: block; }
+.showcase-card h3, .showcase-card p { padding: 0 14px; margin: 10px 0 0; }
+.showcase-card p { color: rgba(255,255,255,0.8); font-size: 0.9rem; }
+.showcase-card .cta { display: block; padding: 8px 14px 16px; font-weight: 700; color: #fff; }
+
+.site-footer { margin-top: 60px; padding: 24px 0; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+.site-footer a { color: var(--accent); }
+
+.messages { list-style: none; padding: 0; }
+.messages li { padding: 10px 14px; border-radius: var(--radius-sm); background: var(--success-tint); color: #166534; margin-bottom: 10px; }
+
+/* Secondary nav buttons (Manage Articles, Admin, Cancel) — same shape
+   as .btn-nav but visually quieter, so "+ New Article" / "Save
+   changes" stays the one obvious primary action in the header/editor. */
+.btn-nav-secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+.btn-nav-secondary:hover { background: var(--accent-tint); color: var(--accent-dark); }
+
+/* Article editor (kb/article_form.html) — plain server-rendered form,
+   no build step, matching the rest of this app. django-markdownx's
+   MarkdownxWidget renders a bare <textarea class="markdownx-editor">
+   plus a sibling `.markdownx-preview` div (see markdownx/widget.html);
+   the sizing/spacing below is ours, markdownx supplies no CSS of its
+   own outside /admin/. */
+.article-editor, .article-manage { max-width: 760px; margin: 0 auto; padding: 32px 0 60px; }
+.article-editor h1, .article-manage h1 { font-size: 1.6rem; margin: 4px 0 20px; }
+.editor-meta { color: var(--muted); font-size: 0.9rem; margin: -8px 0 24px; }
+
+.field { margin-bottom: 20px; }
+.field-row { display: grid; grid-template-columns: 1fr 200px; gap: 20px; }
+.field label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; color: var(--ink); }
+.field-hint { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); }
+.field-error { margin: 6px 0 0; font-size: 0.8rem; color: #dc2626; }
+.field.has-error input, .field.has-error select, .field.has-error textarea { border-color: #dc2626; }
+.form-errors { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 20px; }
+
+.article-editor input[type="text"],
+.article-editor input[type="url"],
+.article-editor input[type="number"],
+.article-editor select,
+.article-editor textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 0.95rem; background: var(--card-bg); color: var(--ink);
+}
+.article-editor input[type="text"]:focus,
+.article-editor select:focus,
+.article-editor textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.article-editor select[multiple] { height: auto; }
+
+.markdownx { display: block; }
+.markdownx-editor { min-height: 340px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
+.markdownx-preview {
+  margin-top: 12px; padding: 16px 18px; border: 1px dashed var(--border); border-radius: var(--radius);
+  background: var(--bg); min-height: 60px;
+}
+.markdownx-preview:empty { display: none; }
+.markdownx-preview p:first-child { margin-top: 0; }
+
+.editor-actions { display: flex; gap: 12px; margin-top: 8px; }
+
+/* Manage-articles list */
+/* flex-wrap + gap so the "+ New Article" button drops to its own line
+   with breathing room on narrower widths (e.g. the superuser sidebar
+   eating into content width) instead of shrinking into/overlapping the
+   heading -- flex-shrink defaults to 1 on both children with no gap,
+   so without this the button and "Manage articles" text could collide. */
+.manage-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.manage-header h1 { margin: 0; }
+.manage-header .btn-nav { flex-shrink: 0; }
+.manage-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.manage-table th, .manage-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.manage-table th { background: var(--bg); font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.manage-table tr:last-child td { border-bottom: none; }
+.manage-row-actions a { font-weight: 500; }
+.status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.status-badge.status-draft { background: #fef3c7; color: #92400e; }
+.status-badge.status-published { background: var(--success-tint); color: #166534; }
+.status-badge.status-archived { background: #f3f4f6; color: #6b7280; }
+.pagination { display: flex; gap: 16px; align-items: center; margin-top: 20px; font-size: 0.9rem; color: var(--muted); }
+
+/* Categories & Tags (kb/taxonomy_manage.html, taxonomy_item_form.html) */
+.taxonomy-section { margin-bottom: 48px; }
+.taxonomy-section h2 { font-size: 1.15rem; margin: 0 0 14px; }
+.taxonomy-section .field-hint { margin: 0 0 18px; }
+.inline-add-form { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.inline-add-form .field { margin-bottom: 0; }
+.inline-add-form label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.inline-add-form input[type="text"], .inline-add-form input[type="number"] {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 0.9rem; background: var(--card-bg); color: var(--ink);
+}
+.inline-add-form input[type="number"] { width: 160px; }
+.inline-delete-form { display: inline; }
+.link-button {
+  background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer;
+  color: var(--accent); text-decoration: none; font-weight: 500;
+}
+.link-button:hover { color: #dc2626; }
+
+/* ---------------------------------------------------------------------
+   Superuser authoring sidebar (kb/templates/kb/base.html)
+
+   Dark panel in --brand-mark, bright --accent for the primary
+   action and hover/active
+   states, profile chip pinned to the bottom. Static column on wide
+   screens; a
+   hamburger-triggered off-canvas drawer below ~900px, since the
+   previous inline header buttons wrapped onto a second row that
+   overlapped page content on narrower viewports. Only rendered for
+   superusers (see base.html) — the public reading pages never pay for
+   any of this.
+   --------------------------------------------------------------------- */
+:root { --sidebar-width: 240px; }
+
+.sidebar-toggle {
+  display: none; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border: none; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm); margin-right: 4px; flex-shrink: 0;
+}
+.sidebar-toggle:hover { background: var(--accent-tint); }
+.sidebar-toggle-bars, .sidebar-toggle-bars::before, .sidebar-toggle-bars::after {
+  display: block; width: 20px; height: 2px; background: var(--ink); border-radius: 2px;
+}
+.sidebar-toggle-bars { position: relative; }
+.sidebar-toggle-bars::before, .sidebar-toggle-bars::after { content: ''; position: absolute; left: 0; }
+.sidebar-toggle-bars::before { top: -6px; }
+.sidebar-toggle-bars::after { top: 6px; }
+
+.side-nav-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(15, 10, 40, 0.5); z-index: 290;
+}
+.side-nav-overlay.visible { display: block; }
+
+.side-nav {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-width);
+  background: var(--brand-mark); color: #ede9fe; z-index: 300;
+  display: flex; flex-direction: column; overflow-y: auto;
+  transform: translateX(-100%); transition: transform 0.2s ease;
+}
+.side-nav.open { transform: translateX(0); }
+
+.side-nav-brand {
+  display: block; padding: 20px 20px 16px; font-weight: 700; font-size: 1.15rem;
+  color: #fff; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;
+}
+.side-nav-brand span { font-weight: 400; opacity: 0.85; }
+
+.side-nav-section { padding: 14px 12px; flex-shrink: 0; }
+.side-nav-link {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 2px;
+  border-radius: var(--radius-sm); color: #ede9fe; text-decoration: none;
+  font-size: 0.92rem; font-weight: 500; transition: background 0.15s, color 0.15s;
+}
+.side-nav-link svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+.side-nav-link:hover { background: rgba(255,255,255,0.08); }
+.side-nav-link.active { background: var(--accent); color: #fff; }
+.side-nav-link.active:hover { background: var(--accent-dark); }
+
+.side-nav-profile {
+  display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; margin-top: auto;
+}
+.side-nav-avatar {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--accent);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; flex-shrink: 0;
+}
+.side-nav-profile-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.side-nav-name { font-size: 0.85rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-nav-email { font-size: 0.75rem; color: rgba(237,233,254,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-nav-logout-form { margin: 0; flex-shrink: 0; display: flex; }
+.side-nav-logout {
+  color: rgba(237,233,254,0.7); flex-shrink: 0; display: flex;
+  background: none; border: none; padding: 0; cursor: pointer; font: inherit;
+}
+.side-nav-logout:hover { color: #fff; }
+.side-nav-logout svg { width: 18px; height: 18px; }
+
+@media (min-width: 900px) {
+  body.has-sidebar .side-nav { transform: translateX(0); }
+  /* Push the sidebar's width out of body's own content box (padding,
+     not a margin on each .wrap individually) so every .wrap inside
+     header/main/footer keeps doing its own `margin: 0 auto` centering
+     -- but now within the narrower space to the right of the sidebar,
+     rather than being hard-left-aligned against it. The previous
+     approach set margin-left directly on .site-main, which overrides
+     .wrap's own auto margin instead of centering within what's left --
+     looked cramped against the sidebar with all the freed-up width
+     pushed to the far right instead of split evenly. */
+  body.has-sidebar { padding-left: var(--sidebar-width); }
+  .sidebar-toggle { display: none !important; }
+  .side-nav-overlay { display: none !important; }
+}
+@media (max-width: 899px) {
+  body.has-sidebar .sidebar-toggle { display: inline-flex; }
+}

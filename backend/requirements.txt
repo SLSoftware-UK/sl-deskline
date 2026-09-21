@@ -1,0 +1,12 @@
+django>=6.1,<6.2
+dj-database-url>=2.1
+django-environ>=0.11
+whitenoise>=6.6
+psycopg2-binary>=2.9
+requests>=2.31
+gunicorn>=21.2
+Pillow>=10.0
+django-htmx>=1.17
+django-markdownx>=4.0,<5.0
+bleach[css]>=6.0,<7.0  # [css] extra pulls in tinycss2, needed for CSSSanitizer (kb/markdown_utils.py)
+redis>=5.0  # client library for Django's own built-in RedisCache (CACHES in settings.py); NOT django-redis

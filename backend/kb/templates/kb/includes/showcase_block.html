@@ -1,0 +1,15 @@
+{% if showcases %}
+<section class="showcase-block">
+  <h2>More from {{ site_settings.site_name }}</h2>
+  <div class="showcase-grid">
+    {% for item in showcases %}
+      <a class="showcase-card" href="{{ item.cta_url }}" target="_blank" rel="noopener">
+        <img src="{{ item.screenshot.url }}" alt="{{ item.alt_text|default:item.title }}">
+        <h3>{{ item.title }}</h3>
+        {% if item.caption %}<p>{{ item.caption }}</p>{% endif %}
+        <span class="cta">{{ item.cta_label }} →</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

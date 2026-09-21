@@ -1,0 +1,112 @@
+/* Support desk pages — layered on kb/css/help.css (same tokens, buttons,
+   header and sticky-footer layout), loaded only by tickets/base.html.
+
+   Every colour comes from the --accent* custom properties defined in
+   kb/static/kb/css/help.css's :root block (and driven per-deployment
+   from branding.SiteSettings — see that file's header comment), so
+   nothing here declares its own palette. Status/urgency chip colours
+   are the exception — they are semantic (blue = open, amber = in
+   progress, green = resolved, red = high urgency), not brand colours,
+   so they stay literal.
+
+   The .tickets-nav tabs fill kb/base.html's {% block page_nav %}
+   directly under the site header, so they need the full-bleed
+   background + the shared .wrap gutter to line up with it. */
+
+.tickets-nav { background: var(--card-bg); border-bottom: 1px solid var(--border); }
+.tickets-nav .wrap { max-width: 1200px; padding-left: 2rem; padding-right: 2rem; }
+.tickets-page { padding: 24px 0 60px; }
+.ticket-narrow { max-width: 760px; }
+
+.tickets-tabs { display: flex; gap: 4px; overflow-x: auto; }
+.tickets-tabs a {
+  padding: 12px 14px; color: var(--muted); text-decoration: none; font-weight: 500;
+  font-size: 0.9rem; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tickets-tabs a:hover { color: var(--accent); }
+.tickets-tabs a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tickets-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.tickets-header h1, .ticket-narrow h1 { font-size: 1.6rem; margin: 4px 0 16px; }
+.tickets-filter { margin: 0 0 16px; }
+.tickets-filter label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); font-weight: 500; }
+.tickets-filter select, .staff-controls select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--card-bg); font: inherit; color: var(--ink);
+}
+
+.muted { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
+.empty-state { color: var(--muted); padding: 32px 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.table-scroll { overflow-x: auto; }
+.ticket-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.ticket-table th, .ticket-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: top; }
+.ticket-table th { background: var(--bg); font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.ticket-table tr:last-child td { border-bottom: none; }
+.ticket-table td a { color: var(--ink); font-weight: 500; }
+.ticket-table td .muted { display: block; }
+.sort-header { color: inherit; text-decoration: none; }
+.sort-header:hover, .sort-header-active { color: var(--accent); }
+.sort-arrow { font-size: 0.65rem; }
+
+.ticket-status, .urgency { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.ticket-status-open { background: #e6f4ff; color: #1668a3; }
+.ticket-status-in_progress { background: #fff4e0; color: #a3670f; }
+.ticket-status-waiting_on_customer { background: var(--accent-tint); color: var(--accent-dark); }
+.ticket-status-resolved { background: var(--success-tint); color: var(--success); }
+.urgency-low { background: #eef1f4; color: #5b6572; }
+.urgency-normal { background: #e6f4ff; color: #1668a3; }
+.urgency-high { background: #fde8e8; color: #a12626; }
+
+.ticket-linked { background: var(--accent-tint); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; }
+
+.ticket-form textarea, .ticket-form input[type="text"] {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font: inherit; color: var(--ink); background: var(--card-bg);
+}
+.ticket-form textarea:focus, .ticket-form input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+.urgency-picker { border: none; padding: 0; margin: 0 0 20px; }
+.urgency-picker legend { font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; }
+.urgency-option {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); cursor: pointer;
+}
+.urgency-option:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
+.urgency-option small { color: var(--muted); }
+.urgency-option input { accent-color: var(--accent); }
+
+.ticket-meta { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px; }
+.ticket-meta dl { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
+.ticket-meta dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; }
+.ticket-meta dd { margin: 2px 0 0; font-size: 0.9rem; }
+.staff-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.staff-controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.staff-controls-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--accent); }
+/* help.css's .link-button is styled as a destructive/delete action
+   (it hovers red). These two re-point it at the accent colour, since
+   "Assign to me" is anything but destructive. */
+.staff-controls .link-button { color: var(--accent); }
+.staff-controls .link-button:hover { color: var(--accent-dark); }
+
+.message-thread { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 12px; }
+.message { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; max-width: 92%; }
+.message-customer { align-self: flex-start; }
+.message-staff { align-self: flex-end; background: var(--accent-tint); border-color: var(--accent-light); }
+.message-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+.message-meta strong { color: var(--ink); }
+.message-body p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.message-body p:last-child { margin-bottom: 0; }
+.badge-staff { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 0.7rem; font-weight: 600; }
+
+.reply-form { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.reply-form button[disabled] { opacity: 0.6; cursor: wait; }
+
+@media (max-width: 900px) {
+  .tickets-nav .wrap { padding-left: 20px; padding-right: 20px; }
+}
+@media (max-width: 600px) {
+  .message { max-width: 100%; }
+  .ticket-meta dl { gap: 10px 18px; }
+}

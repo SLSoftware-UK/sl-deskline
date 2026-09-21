@@ -1,0 +1,9 @@
+{% extends "tickets/base.html" %}
+
+{% block tickets_content %}
+<div class="ticket-narrow">
+  <h1 class="ticket-subject">{{ ticket.subject }} <span class="muted">#{{ ticket.pk }}</span></h1>
+  {% include "tickets/includes/ticket_meta.html" %}
+  {% include "tickets/includes/conversation.html" %}
+</div>
+{% endblock %}

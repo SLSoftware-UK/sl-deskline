@@ -1,0 +1,16 @@
+{% if already_rated %}
+  <p class="rating-thanks">{% if just_voted %}Thanks for the feedback!{% else %}You've already rated this article — thanks!{% endif %}</p>
+{% else %}
+  <p>Was this article helpful?</p>
+  <form
+    hx-post="{% url 'kb:article-rate' article.slug %}"
+    hx-target="#rating-widget"
+    hx-swap="innerHTML"
+    action="{% url 'kb:article-rate' article.slug %}"
+    method="post"
+  >
+    {% csrf_token %}
+    <button type="submit" name="helpful" value="yes" class="rating-yes">👍 Yes</button>
+    <button type="submit" name="helpful" value="no" class="rating-no">👎 No</button>
+  </form>
+{% endif %}

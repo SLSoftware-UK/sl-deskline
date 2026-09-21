@@ -1,0 +1,131 @@
+# SL Deskline
+
+> SL Deskline is an open-source (MIT), self-hosted knowledge base and support ticket desk in one Django service. The knowledge base is public, server-rendered and search-engine friendly; the ticket desk is login-required and lets customers in one or more organisations raise tickets that your support agents work. Sign-in is plain Django auth by default, with an optional code-exchange SSO backend for putting the desk behind another product's accounts.
+
+Source: https://github.com/SLSoftware-UK/sl-deskline. Every page is server-rendered Django with no React/Vite build. That is deliberate: search engines and AI crawlers can read knowledge-base articles without running JavaScript. The ticket desk uses the same stack, with htmx for the reply thread and the support-agent controls. There is no DRF, no JWT and no CORS anywhere in this repo.
+
+The default deployment is **one container and one volume**: SQLite (in WAL mode) and uploaded media both live under `DATA_DIR`, so there is no external database, object storage or Redis to provision. Postgres (`DATABASE_URL`) and Redis (`REDIS_URL`) are optional.
+
+## Overview
+
+- [README](README.md): What the product is, self-hosting (one container, one volume, Railway recipe), quickstart, features, authentication, branding and the full environment-variable table.
+- [Help centre design doc](docs/help-center-roadmap.md): Why the knowledge base is public and plain server-rendered Django, and how the members-only content tier works.
+- [LICENSE](LICENSE): MIT.
+
+## Capabilities
+
+Knowledge base (public, no login needed):
+
+- Home page with no filter shows one section per category: its newest 6 articles plus a "See all N articles" link (`kb/views.py::ARTICLES_PER_CATEGORY_ON_HOME`). Any search, category or tag filter switches to a flat grid paginated at 12 (`ARTICLES_PER_PAGE`). Categories with no visible published articles are left off the home page.
+- Browse and search help articles by category and tag. Search is stemmed full-text search with title weighted above summary above body, every word required: on SQLite it uses an FTS5 index (`kb/search_index.py`: `porter unicode61` tokenizer, `bm25(kb_articleindex, 1.0, 0.4, 0.2)` ranking; kept in sync by `kb/signals.py`; rebuildable with `python manage.py rebuild_search_index`); on Postgres it uses Postgres full-text search with A/B/C weights (`kb/views.py::_search_articles`); a SQLite build without FTS5 falls back to `icontains`.
+- Articles combine Markdown prose with optional numbered how-to steps and photos. Articles with steps emit schema.org `HowTo` structured data.
+- Anyone can rate an article ("Was this helpful?"): one vote per article, keyed to the user id when signed in and to a cookie token when not.
+- Categories carry a visibility tier: `public` or `members`. A `members` category's articles are hidden from listings, from the category nav, from the featured slot, from `sitemap.xml`, and 404 on a direct URL, unless the reader is signed in and either belongs to at least one organisation or is a support agent (`kb/views.py::_can_see_members_only`).
+- Categories are ordered by `Category.sort_order` (lower first), then name (`Meta.ordering = ['sort_order', 'name']`), so home-page sections, the category nav and `/taxonomy/` read the same way. `Article.sort_order` is nullable and deliberately not in `Meta.ordering` (the manage list and sitemap stay newest-first).
+- SEO: per-article meta description, canonical URLs, Open Graph tags, `sitemap.xml`, and a host-aware `robots.txt`.
+- Superusers write articles in an in-app Markdown editor with live preview (`/articles/new/`, `/articles/manage/`) and manage categories and tags at `/taxonomy/`. Django Admin handles step/photo inlines, featured articles and product showcase cards. Drag-and-drop image uploads go through this app's own resize/EXIF-strip pipeline (`kb/image_processing.py`), not markdownx's stock 500x500 crop.
+- Signed-in accounts see a "Couldn't find an answer? Raise a ticket" link on each article. It opens the ticket form and records which article the reader came from (`Ticket.linked_article_id`).
+
+Ticket desk (`/tickets/`, login required, not indexed: `robots.txt` disallows it and every page is `noindex`):
+
+- A customer raises a ticket with a subject, a first message and an urgency (low, normal or high).
+- Each ticket has one flat message thread between the customer and support agents.
+- Statuses: open, in progress, waiting on customer, resolved. When a customer replies to a "waiting on customer" ticket, it moves back to "in progress".
+- Customers see the tickets they raised plus every ticket filed under any **organisation** they are a member of, so colleagues can follow each other's issues. A customer in several organisations chooses one when raising a ticket; a customer in none can still raise tickets, filed under no organisation and visible to the raiser and agents only. Support agents see and work every ticket.
+- Only support agents can change a ticket's status or assignment, and only support agents are assignable.
+- Resolved tickets have their own screen. The open list can be filtered by status and sorted by subject, organisation (agents only), urgency or last update (an allowlist, never a raw field name).
+- Email notifications: the customer gets a confirmation when they raise a ticket, plus emails for agent replies and resolution; agents get emails for new tickets, customer replies and assignments. Sent over SMTP by default, or SMTP2GO's HTTPS API when `SMTP2GO_API_KEY` is set. A failed send is logged and never breaks the ticket workflow.
+
+Not built: attachments on ticket messages; per-organisation private knowledge bases (the nullable `org_id` columns on the KB models are reserved for it and deliberately unused).
+
+## Account
+
+- Sign-in is pluggable, selected by `SSO_BACKEND` (validated at import; anything else is `ImproperlyConfigured`).
+- `SSO_BACKEND='local'` (the default): plain Django auth. `/login/` is one username-or-email + password form for every account, customers and support agents alike. Accounts are created by an operator in Django Admin or with `createsuperuser`; there is no self-signup. `/sso/callback/` is a 404 and `/staff/login/` is a temporary (302) redirect to `/login/` (keeping `?next=`). A fresh clone needs no external service: `migrate`, `createsuperuser`, sign in.
+- `SSO_BACKEND='code_exchange'`: customers sign in at an external identity provider and arrive at `/sso/callback/?code=...`; `/login/` is an informational page linking to `SSO_PROVIDER_LOGIN_URL?next=...`, and support agents use the agents-only password form at `/staff/login/`. See "Optional SSO" below.
+- The password form (`/login/` in local mode, `/staff/login/` with SSO) is throttled per (client IP, submitted identifier): `LOGIN_MAX_ATTEMPTS` (5) and `LOGIN_LOCKOUT_SECONDS` (900). `/admin/login/` is Django's own view and is not throttled.
+- `POST /logout/` (and `POST /staff/logout/`, the same view) flushes the local session; GET is a 405. With SSO it does not end the provider's session.
+
+## Two different meanings of "staff"
+
+Two unrelated populations live in one `auth_user` table:
+
+- **Customers**: any account without `is_staff`, with one `accounts.Membership` per organisation they belong to (zero or more). With the local backend they have ordinary passwords; with SSO they are shadow users with unusable passwords, created and re-synced from the provider's exchange response. They raise tickets, and members-only KB categories open for them once they hold at least one membership.
+- **Support agents**: local Django accounts with `is_staff`/`is_superuser`. They have real passwords, work the ticket queue, and need **no memberships**. Superusers additionally author KB articles (authoring is superuser-only, `kb/decorators.py::superuser_required`), so a plain `is_staff` agent works tickets but cannot write articles. Agents see members-only KB categories, and cannot raise a ticket (`/tickets/new/` renders them an explanatory 403).
+
+Django's own `is_staff` flag is the whole line between the two, and it means *support agent* here and nothing else. `accounts/sso.py` refuses to sign an `is_staff` or superuser account in through SSO (or attach memberships to it).
+
+## Identity model: Organisation and Membership
+
+`accounts.Organisation` (name, unique slug, nullable unique `external_id`) is a customer organisation with a local auto-increment pk. `accounts.Membership` joins a user to an organisation with a role (`owner`/`admin`/`member`, recorded but not yet used for permissions); a user may hold several. `Ticket.organisation` is a nullable FK (PROTECT).
+
+Operators create organisations and memberships in Django Admin (Membership inlines on both the Organisation and User pages). With SSO, the exchange response's `user.organisations` list is synced on every sign-in as a **full replace of provider-managed memberships**: organisations are matched on `external_id` = the provider's id (stringified), memberships in provider-managed organisations that are no longer reported are deleted, and memberships in hand-made organisations (no `external_id`) are left alone. There is no organisation switcher: a multi-organisation customer sees the union.
+
+## Branding: SiteSettings
+
+`branding.SiteSettings` is a singleton (always pk=1, `SiteSettings.load()`), edited in Django Admin under Branding: `site_name` (default "SL Deskline"), `logo`, `accent_color` (`#rrggbb`, written into the `--accent` CSS custom property), `support_email`, and `notification_from_email` (falls back to `DEFAULT_FROM_EMAIL`). `branding/context_processors.py` exposes it to every template as `site_settings`; `tickets/notifications.py` passes it explicitly into email templates, which have no request.
+
+## Optional SSO (`SSO_BACKEND='code_exchange'`) is push-only
+
+`accounts/sso.py` is the whole story (its module docstring documents the exchange contract); `accounts/views.py` stays thin.
+
+- **This service never initiates a sign-in.** There is no silent-SSO middleware, no authorize redirect and no `prompt=none`. The provider mints a one-time `code` inside its own authenticated app and sends the browser to `/sso/callback/?code=...&next=<path>`.
+- **The code is redeemed server-to-server.** `POST SSO_EXCHANGE_URL` with JSON `{"code": ...}` → HTTP 200 `{"user": {"email", "first_name", "last_name", "organisations": [{"id", "name", "slug", "role"}]}}`. Any other status is an invalid/expired code; extra top-level keys are ignored. The code is opaque here and there is deliberately no shared secret to verify it with, so the response body is the only source for the shadow `User` (username = email) and its memberships. Missing email → refused; empty/missing `organisations` → allowed; a malformed shape (wrong types, empty or >64-char org id) → refused cleanly, nothing written; `role` outside owner/admin/member → member.
+- **An SSO login never authenticates as an existing `is_staff`/`is_superuser` account**, and never modifies one.
+- **`/sso/callback/` accepts the code as either `code` or `sso_code`**, and an optional local `next` path (defaulting to `/`; anything that is not a local path is dropped).
+- **`next=/` means the knowledge-base home.** A provider may build every callback on the ticket host while sending `next=/` to mean the help centre; a local `/` on a ticket host is what `host_middleware` rewrites to `/tickets/`, so `sso_callback` redirects an explicit `next=/` on a ticket host to `settings.SITE_URL` instead. A callback with *no* `next` keeps redirecting to a local `/`.
+- Settings: `SSO_EXCHANGE_URL` and `SSO_PROVIDER_LOGIN_URL` are both required in this mode, or settings raise `ImproperlyConfigured`.
+- Django Admin's own login is left alone in both modes.
+
+## Two hostnames, one service, one session
+
+The help centre and the ticket desk can share one hostname (the desk at `/tickets/`) or be given one each (e.g. `help.example.com` and `support.example.com`) pointing at this same service, which serves the identical URL space on both. The only host-based routing is `support_core/host_middleware.py`, which redirects a bare `/` on a host listed in `TICKET_HOSTS` to `/tickets/`. `kb/context_processors.py::tickets_url` uses the same `is_ticket_host()` helper to decide whether the header's "Tickets" link and an article's "Raise a ticket" CTA are relative paths or absolute URLs built on `TICKET_SITE_URL` (which defaults to `SITE_URL`, and is also used for ticket links in outbound email).
+
+With two hosts, set `SESSION_COOKIE_DOMAIN` to the parent domain (e.g. `.example.com`) so a visitor recognised on one host is recognised on the other. The cookie name is fixed as `SESSION_COOKIE_NAME = 'deskline_sessionid'`, never plain `sessionid`: a parent-domain cookie is sent to every sibling host, where a second Django app's `sessionid` would collide with it. Leave `SESSION_COOKIE_DOMAIN` blank for a single host and locally (a browser will not set a parent-domain cookie on `localhost`, and login fails silently).
+
+## URL map
+
+```
+/                        knowledge base home (article list)
+/robots.txt              kb (host-aware: ticket hosts get Disallow: /)
+/sitemap.xml             django.contrib.sitemaps (members-only articles excluded)
+/articles/...            kb: detail, rate, and superuser authoring
+/categories/ /tags/ /taxonomy/   kb authoring
+/tickets/                ticket list                    (login required)
+/tickets/resolved/       resolved list
+/tickets/new/            raise a ticket                 (accepts ?article=<id>)
+/tickets/<pk>/           ticket detail
+/tickets/<pk>/messages/  reply                          (POST, htmx)
+/tickets/<pk>/update/    status / assignment            (POST, htmx, agents only)
+/login/                  local: password form for every account
+                         code_exchange: informational page linking to the provider
+/sso/callback/           code_exchange only (404 in local mode): ?code= or ?sso_code=,
+                         optional &next=; an explicit next=/ on a ticket host crosses to SITE_URL
+/logout/                 (POST) ends the local session
+/staff/login/            local: 302 to /login/; code_exchange: agents-only password form
+/staff/logout/           (POST) same view as /logout/
+/admin/                  Django Admin (including Branding -> Site settings)
+/markdownx/upload/       superuser-gated (this app's own view, not markdownx's)
+/markdownx/markdownify/  superuser-gated
+/media/...               uploaded files, served from MEDIA_ROOT
+/api/health/             plain JsonResponse liveness
+```
+
+## Technical
+
+- [GitHub: sl-deskline](https://github.com/SLSoftware-UK/sl-deskline): Source code (Django 6.1, server-rendered templates and htmx, Python 3.12). Issues are the support channel; the project is provided as-is with no SLA.
+- Apps: `accounts` (Organisation/Membership, sign-in, SSO), `branding` (SiteSettings), `kb` (knowledge base) and `tickets` (ticket desk), plus the project package `support_core` (settings, root URLs, security headers, SQLite tuning, ticket-host root redirect), which has an AppConfig only for its `ready()` hook.
+- Auth: session-based. No JWT is created or verified anywhere, and there is no DRF, no simplejwt and no corsheaders. The only cross-service call is the outbound server-to-server SSO exchange, and only when `SSO_BACKEND='code_exchange'`.
+- Database: SQLite at `DATA_DIR/db.sqlite3` unless `DATABASE_URL` is set. `support_core/db.py` applies `journal_mode=WAL`, `busy_timeout=5000`, `synchronous=NORMAL` and `foreign_keys=ON` to every new SQLite connection via `connection_created`. A Postgres `DATABASE_URL` gets `CONN_MAX_AGE=600`, connection health checks, and an `sslmode=require` floor outside `DEBUG`.
+- Media: filesystem storage at `MEDIA_ROOT` (default `DATA_DIR/media`), served by the app itself at `/media/`. There is no object storage. A volume mounts into one container, so **run a single replica**.
+- Container: `backend/Dockerfile` (`python:3.12-slim`) runs `collectstatic` at build time, then `migrate` and gunicorn (`support_core.wsgi`, 2 workers, `--timeout 120`, bound to `${PORT:-8000}`) on start. `backend/railway.json` selects the Dockerfile builder.
+- Cache: `REDIS_URL` (Django's built-in `RedisCache`) if set, otherwise per-process `LocMemCache`. The only consumer is the sign-in throttle.
+- `KB_PURGE_ORPHANED_IMAGES` (default **False**) gates the markdown-image housekeeping in `kb/image_cleanup.py`. It derives "orphaned" from the articles in *this* database and deletes everything else under `markdownx/` in storage, so only turn it on when storage holds nothing but this database's uploads.
+- `EMAIL_TIMEOUT` (default 10 seconds) bounds SMTP sends, which happen inside the request that saved the ticket.
+- Crawler-facing image URLs (`og:image`, schema.org `image`) go through `kb/views.py::absolute_media_url`, which prefixes root-relative media URLs with `SITE_URL`.
+- Local dev and tests: see [README.md](README.md). Tests are `DEBUG=True python manage.py test`, run from `backend/`.
+- Environment variables: the README's Configuration table and `backend/.env.example` both list every variable `support_core/settings.py` reads, and nothing it does not.
+
+## Legal
+
+- [LICENSE](LICENSE): MIT License, Copyright (c) 2026 Ed Marsh / SL Software.

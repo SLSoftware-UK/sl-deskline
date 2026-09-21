@@ -1,0 +1,37 @@
+{% comment %}
+  The thread plus the reply box. Rendered inline on the detail page, and
+  swapped whole (hx-swap="outerHTML" onto #conversation) by an htmx
+  reply — which is why the <section> carries the id it targets.
+{% endcomment %}
+<section id="conversation" class="conversation">
+  <ol class="message-thread">
+    {% for m in thread %}
+    <li class="message {% if m.author.is_staff %}message-staff{% else %}message-customer{% endif %}">
+      <div class="message-meta">
+        <strong>{{ m.author.get_full_name|default:m.author.email }}</strong>
+        {% if m.author.is_staff %}<span class="badge-staff">Support</span>{% endif %}
+        <span>{{ m.created_at|date:"j M Y, H:i" }}</span>
+      </div>
+      <div class="message-body">{{ m.body|linebreaks }}</div>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <form id="reply" class="ticket-form reply-form" method="post" action="{% url 'tickets:reply' ticket.pk %}"
+        hx-post="{% url 'tickets:reply' ticket.pk %}" hx-target="#conversation" hx-swap="outerHTML"
+        hx-disabled-elt="find button">
+    {% csrf_token %}
+    <label for="{{ reply_form.body.id_for_label }}" class="visually-hidden">Reply</label>
+    {{ reply_form.body }}
+    {% for e in reply_form.body.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+    <button type="submit" class="btn-nav">Send reply</button>
+  </form>
+</section>
+{% comment %}
+  A customer's reply can move the status (waiting_on_customer ->
+  in_progress, see views.py::ticket_reply), and the badge showing it
+  lives outside this section — so on an htmx reply the meta panel rides
+  along out of band. Not included on the full-page render, where it is
+  already on the page in its own right.
+{% endcomment %}
+{% if request.htmx %}{% include "tickets/includes/ticket_meta.html" with oob=True %}{% endif %}

@@ -1,0 +1,111 @@
+{% extends "kb/base.html" %}
+
+{% block title %}Categories & Tags — {{ site_settings.site_name }}{% endblock %}
+{% block meta_description %}{% endblock %}
+
+{% block content %}
+<div class="article-manage taxonomy-manage">
+  <div class="manage-header">
+    <h1>Categories &amp; Tags</h1>
+    <a class="btn-nav btn-nav-secondary" href="{% url 'kb:article-manage' %}">Manage Articles</a>
+  </div>
+
+  <section id="categories" class="taxonomy-section">
+    <h2>Categories</h2>
+
+    <form method="post" action="{% url 'kb:category-create' %}" class="inline-add-form">
+      {% csrf_token %}
+      <div class="field">
+        {{ category_form.name.label_tag }}
+        {{ category_form.name }}
+      </div>
+      <div class="field">
+        {{ category_form.visibility.label_tag }}
+        {{ category_form.visibility }}
+      </div>
+      <div class="field">
+        {{ category_form.sort_order.label_tag }}
+        {{ category_form.sort_order }}
+      </div>
+      <button type="submit" class="btn-nav">Add category</button>
+    </form>
+    <p class="field-hint">Added to the site's own public Help Centre — there's no way to author
+      into another org's KB from here (or anywhere else in this app yet).</p>
+
+    {% if categories %}
+    <table class="manage-table">
+      <thead>
+        <tr><th>Order</th><th>Name</th><th>Slug</th><th>Org ID</th><th>Visibility</th><th>Articles</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for category in categories %}
+        <tr>
+          <td>{{ category.sort_order }}</td>
+          <td>{{ category.name }}</td>
+          <td>{{ category.slug }}</td>
+          <td>{{ category.org_id|default:"— Public" }}</td>
+          <td>{{ category.get_visibility_display }}</td>
+          <td>{{ category.articles.count }}</td>
+          <td class="manage-row-actions">
+            <a href="{% url 'kb:category-edit' category.pk %}">Edit</a>
+            ·
+            <form method="post" action="{% url 'kb:category-delete' category.pk %}" class="inline-delete-form"
+                  onsubmit="return confirm('Delete category \'{{ category.name|escapejs }}\'? This can\'t be undone.');">
+              {% csrf_token %}
+              <button type="submit" class="link-button">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No categories yet.</p>
+    {% endif %}
+  </section>
+
+  <section id="tags" class="taxonomy-section">
+    <h2>Tags</h2>
+
+    <form method="post" action="{% url 'kb:tag-create' %}" class="inline-add-form">
+      {% csrf_token %}
+      <div class="field">
+        {{ tag_form.name.label_tag }}
+        {{ tag_form.name }}
+      </div>
+      <button type="submit" class="btn-nav">Add tag</button>
+    </form>
+    <p class="field-hint">Added to the site's own public Help Centre — there's no way to author
+      into another org's KB from here (or anywhere else in this app yet).</p>
+
+    {% if tags %}
+    <table class="manage-table">
+      <thead>
+        <tr><th>Name</th><th>Slug</th><th>Org ID</th><th>Articles</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for tag in tags %}
+        <tr>
+          <td>{{ tag.name }}</td>
+          <td>{{ tag.slug }}</td>
+          <td>{{ tag.org_id|default:"— Public" }}</td>
+          <td>{{ tag.articles.count }}</td>
+          <td class="manage-row-actions">
+            <a href="{% url 'kb:tag-edit' tag.pk %}">Edit</a>
+            ·
+            <form method="post" action="{% url 'kb:tag-delete' tag.pk %}" class="inline-delete-form"
+                  onsubmit="return confirm('Delete tag \'{{ tag.name|escapejs }}\'? This can\'t be undone.');">
+              {% csrf_token %}
+              <button type="submit" class="link-button">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No tags yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

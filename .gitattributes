@@ -1,0 +1,5 @@
+# Normalize line endings to LF in the repository regardless of a
+# contributor's local core.autocrlf setting — without this, every
+# text file in the working tree shows as modified purely from
+# CRLF/LF churn (no functional difference, just noisy `git status`).
+* text=auto eol=lf

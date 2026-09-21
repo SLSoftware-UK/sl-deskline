@@ -1,0 +1,12 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+Your ticket "{{ ticket.subject }}" has been resolved.
+
+View your ticket:
+
+{{ ticket_url }}
+
+-- {{ site_settings.site_name }}
+{% if site_settings.support_email %}
+Need help? Contact us at {{ site_settings.support_email }}.
+{% endif %}

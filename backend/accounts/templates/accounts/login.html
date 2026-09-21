@@ -1,0 +1,53 @@
+{% extends "kb/base.html" %}
+
+{% comment %}
+  The /login/ page when SSO_BACKEND='code_exchange' (settings.LOGIN_URL
+  points here). With the default 'local' backend /login/ renders
+  accounts/password_login.html instead.
+
+  It is informational rather than a redirect, because this service
+  cannot start an SSO handshake -- it can only receive one (see
+  accounts/sso.py's module docstring). The honest thing to render is an
+  explanation plus a link to the identity provider's sign-in
+  (SSO_PROVIDER_LOGIN_URL, carrying `next`), from where the provider
+  sends the visitor back to /sso/callback/ already recognised.
+
+  Styled with kb/css/help.css's existing .article-editor / .field /
+  .btn-nav classes -- no new CSS.
+{% endcomment %}
+
+{# Title/description/canonical come from the view context (meta_title, #}
+{# meta_description, canonical_path) rather than block overrides, so #}
+{# <title>, og:title, og:description and <link rel="canonical"> in #}
+{# kb/base.html all agree -- see accounts/views.py::login_view. #}
+
+{% block content %}
+<div class="article-editor">
+  <h1>Sign in</h1>
+
+  <p class="editor-meta">
+    {% if next_path and next_path != '/' %}
+      You will be brought back to <strong>{{ next_path }}</strong> once you are signed in.
+    {% else %}
+      You will be brought back here once you are signed in.
+    {% endif %}
+  </p>
+
+  <div class="summary">
+    <p>
+      The help desk does not have its own password. You sign in with your
+      existing account, and you are sent straight back here already
+      recognised &mdash; so your organisation&rsquo;s tickets and members-only
+      articles are waiting for you.
+    </p>
+  </div>
+
+  <div class="editor-actions">
+    <a class="btn-nav" href="{{ provider_login_url }}" rel="noopener">Continue to sign in</a>
+  </div>
+
+  <p class="field-hint" style="margin-top: 24px;">
+    Support agent? <a href="{% url 'accounts:staff-login' %}">Sign in with your support agent account</a>.
+  </p>
+</div>
+{% endblock %}

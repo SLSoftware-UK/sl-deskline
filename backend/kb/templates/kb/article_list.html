@@ -1,0 +1,77 @@
+{% extends "kb/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="hero">
+  <h1>{{ site_settings.site_name }} — Knowledge Base</h1>
+  <p>Guides and answers. Search by topic, or browse by category below.</p>
+</section>
+
+{% if featured %}
+<section class="featured-article">
+  <h2>Featured article</h2>
+  <a class="article-card featured" href="{% url 'kb:article-detail' featured.article.slug %}">
+    <h3>{{ featured.article.title }}</h3>
+    <p>{{ featured.article.summary|truncatewords:30 }}</p>
+  </a>
+</section>
+{% endif %}
+
+<section class="filters">
+  <form method="get" action="{% url 'kb:article-list' %}">
+    {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+    <label>Category
+      <select name="category" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for c in categories %}
+          <option value="{{ c.slug }}" {% if c.slug == selected_category %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Tag
+      <select name="tag" onchange="this.form.submit()">
+        <option value="">Any tag</option>
+        {% for t in tags %}
+          <option value="{{ t.slug }}" {% if t.slug == selected_tag %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+{% if is_filtered %}
+<p class="results-count">{{ page_obj.paginator.count }} article{{ page_obj.paginator.count|pluralize }}</p>
+<section class="article-grid">
+  {% for article in page_obj %}
+    {% include "kb/includes/article_card.html" with show_category=True %}
+  {% empty %}
+    <p>No articles match yet — check back soon, or try a different search.</p>
+  {% endfor %}
+</section>
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="pagination" aria-label="Pages">
+  {% if page_obj.has_previous %}<a href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+{% for section in category_sections %}
+<section class="category-section">
+  <div class="category-section-header">
+    <h2 class="category-section-title">{{ section.category.name }}</h2>
+    {% if section.has_more %}<a class="category-section-more" href="?category={{ section.category.slug }}">See all {{ section.count }} articles →</a>{% endif %}
+  </div>
+  <div class="article-grid">
+    {% for article in section.articles %}
+      {% include "kb/includes/article_card.html" %}
+    {% endfor %}
+  </div>
+</section>
+{% empty %}
+<p>No articles match yet — check back soon, or try a different search.</p>
+{% endfor %}
+{% endif %}
+
+{% include "kb/includes/showcase_block.html" %}
+{% endblock %}

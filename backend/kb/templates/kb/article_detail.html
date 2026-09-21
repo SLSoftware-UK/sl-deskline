@@ -1,0 +1,83 @@
+{% extends "kb/base.html" %}
+{% load static %}
+
+{% block og_type %}article{% endblock %}
+{# hero_image_url, not SITE_URL + the field's own .url: on S3-style #}
+{# storage that .url is already an absolute URL on the bucket's host, #}
+{# so the concatenation would produce https://help.example.comhttps://... #}
+{# kb/views.py::absolute_media_url is the one place that knows the #}
+{# difference. #}
+{% block og_image %}{% if hero_image_url %}<meta property="og:image" content="{{ hero_image_url }}">{% endif %}{% endblock %}
+
+{% block structured_data %}
+{% if howto_schema_json %}
+<script type="application/ld+json">{{ howto_schema_json }}</script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<article class="article-detail">
+  <nav class="breadcrumb"><a href="{% url 'kb:article-list' %}">Help</a> / {{ article.category.name }} / {{ article.title }}</nav>
+
+  <h1>{{ article.title }}</h1>
+  <p class="byline">Last updated {{ article.updated_at|date:"j F Y" }}</p>
+
+  {% if hero_photo %}
+    <img class="hero-photo" src="{{ hero_photo.image.url }}" alt="{{ hero_photo.alt_text|default:article.title }}">
+  {% endif %}
+
+  <section class="summary">
+    <p>{{ article.summary|linebreaksbr }}</p>
+  </section>
+
+  {% if article.body %}
+  <section class="body">
+    {{ article.body_html }}
+  </section>
+  {% endif %}
+
+  {% if article.steps.all %}
+  <section class="steps">
+    <h2>Steps</h2>
+    <ol>
+      {% for step in article.steps.all %}
+        <li>
+          <p>{{ step.instruction|linebreaksbr }}</p>
+          {% if step.photos.all %}
+            <div class="step-photos">
+              {% for photo in step.photos.all %}
+                <img src="{{ photo.image.url }}" alt="{{ photo.alt_text|default:article.title }}">
+              {% endfor %}
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
+  {% if article.tags.all %}
+  <section class="tags">
+    {% for tag in article.tags.all %}
+      <a class="tag" href="{% url 'kb:article-list' %}?tag={{ tag.slug }}">{{ tag.name }}</a>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section id="rating-widget" class="rating-widget">
+    {% include "kb/includes/rating_result.html" with already_rated=already_rated just_voted=False %}
+  </section>
+
+  {% if ticket_url %}
+  <section class="ticket-cta">
+    <p>Couldn't find an answer? <a href="{{ ticket_url }}">Raise a ticket</a></p>
+  </section>
+  {% endif %}
+</article>
+
+{% include "kb/includes/showcase_block.html" %}
+{% endblock %}
+
+{% block extra_body %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js" integrity="sha512-LDpwGAr1u1Ec+HYCHhQpUcAxwyHK4khBmxk5AAOJfrOFy9UifQR7t7CjP1YFmC3Jc4Vp4TQGQrs8xTOKzoxSaA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+{% endblock %}

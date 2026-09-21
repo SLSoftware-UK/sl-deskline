@@ -1,0 +1,65 @@
+{% extends "tickets/base.html" %}
+
+{% block tickets_content %}
+<div class="ticket-narrow">
+  <h1>Raise a ticket</h1>
+
+  {% comment %}
+    Two states, both rendered by views.py::ticket_create:
+
+      staff_cannot_raise — a support agent. Ticket creation is
+        customer-only, and this comes back with a 403, so it is not a
+        working form despite looking like this page.
+      otherwise          — the form. It has an `organisation` field only
+        when the customer belongs to more than one organisation (see
+        forms.py::TicketCreateForm); with none or one there is nothing
+        to choose.
+  {% endcomment %}
+  {% if staff_cannot_raise %}
+    <div class="form-errors">
+      You are signed in as a support agent, and agent accounts cannot raise tickets —
+      the desk is for customers to report problems to you. If you need to test the flow, sign in
+      with a customer account instead.
+    </div>
+  {% else %}
+    {% if article %}
+    <p class="ticket-linked">About the article: <a href="{% url 'kb:article-detail' article.slug %}">{{ article.title }}</a></p>
+    {% endif %}
+
+    <form method="post" class="ticket-form">
+      {% csrf_token %}
+      {# Carried through the post so the link survives a failed submit. #}
+      {% if article %}<input type="hidden" name="article" value="{{ article.pk }}">{% endif %}
+      {% if form.organisation %}
+      <div class="field">
+        <label for="{{ form.organisation.id_for_label }}">{{ form.organisation.label }}</label>
+        {{ form.organisation }}
+        {% for e in form.organisation.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="field">
+        <label for="{{ form.subject.id_for_label }}">Subject</label>
+        {{ form.subject }}
+        {% for e in form.subject.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="field">
+        <label for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>
+        {{ form.body }}
+        {% for e in form.body.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+      </div>
+      <fieldset class="urgency-picker">
+        <legend>{{ form.urgency.label }}</legend>
+        {% for radio in form.urgency %}
+        <label class="urgency-option">
+          {{ radio.tag }}
+          <span class="urgency urgency-{{ radio.data.value }}">{{ radio.choice_label }}</span>
+          <small>{% if radio.data.value == "low" %}No rush{% elif radio.data.value == "normal" %}Standard request{% else %}Blocking my work{% endif %}</small>
+        </label>
+        {% endfor %}
+        {% for e in form.urgency.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+      </fieldset>
+      <button type="submit" class="btn-nav">Submit ticket</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

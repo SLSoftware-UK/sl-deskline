@@ -1,0 +1,12 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+A new ticket has been raised: "{{ ticket.subject }}"{% if ticket.organisation %} ({{ ticket.organisation.name }}){% endif %}.
+
+View the ticket:
+
+{{ ticket_url }}
+
+-- {{ site_settings.site_name }}
+{% if site_settings.support_email %}
+Need help? Contact us at {{ site_settings.support_email }}.
+{% endif %}

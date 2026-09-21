@@ -1,0 +1,232 @@
+{% load humanize static %}<!DOCTYPE html>
+<html lang="en-GB" style="--accent: {{ site_settings.accent_color }};">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{% if meta_title %}{{ meta_title }}{% else %}{{ site_settings.site_name }} — Knowledge Base{% endif %}{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}{{ meta_description }}{% endblock %}">
+<link rel="canonical" href="{{ SITE_URL }}{{ canonical_path }}">
+
+{# Open Graph / social — server-rendered, must be present in the initial #}
+{# HTML response (Facebook's crawler parses ~60KB of raw HTML, no JS). #}
+<meta property="og:site_name" content="{{ site_settings.site_name }}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ meta_title }}{% endblock %}">
+<meta property="og:description" content="{% block og_description %}{{ meta_description }}{% endblock %}">
+<meta property="og:url" content="{{ SITE_URL }}{{ canonical_path }}">
+{% block og_image %}{% endblock %}
+<meta name="twitter:card" content="summary_large_image">
+
+{% block structured_data %}{% endblock %}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'kb/css/help.css' %}">
+{% block extra_head %}{% endblock %}
+</head>
+<body class="{% if request.user.is_superuser %}has-sidebar{% endif %}">
+
+{% if request.user.is_superuser %}
+  {% comment %}
+  Authoring sidebar (dark panel in the brand-mark colour, the accent
+  colour for the primary action, profile chip pinned to the bottom).
+  Built in plain CSS/vanilla JS, no Tailwind or build step, to match
+  this app's architecture — only rendered for superusers, so the
+  public, SEO-critical reading pages are completely unaffected.
+  Customers and non-superuser support agents have sessions too — they
+  just get the header auth block below rather than authoring tools.
+  {% endcomment %}
+  <div id="sideNavOverlay" class="side-nav-overlay"></div>
+  <aside id="sideNav" class="side-nav" aria-label="{{ site_settings.site_name }} authoring menu">
+    <a class="side-nav-brand" href="{% url 'kb:article-list' %}">{{ site_settings.site_name }}</a>
+
+    {% with nav=request.resolver_match.url_name %}
+    <nav class="side-nav-section">
+      <a class="side-nav-link{% if nav == 'article-create' %} active{% endif %}" href="{% url 'kb:article-create' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Article
+      </a>
+      <a class="side-nav-link{% if nav == 'article-manage' or nav == 'article-edit' or nav == 'article-delete' %} active{% endif %}" href="{% url 'kb:article-manage' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
+        Manage Articles
+      </a>
+      <a class="side-nav-link{% if nav == 'taxonomy-manage' or nav|slice:':9' == 'category-' or nav|slice:':4' == 'tag-' %} active{% endif %}" href="{% url 'kb:taxonomy-manage' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9h6a2 2 0 012 2v6l-9 9a2 2 0 01-3 0l-5-5a2 2 0 010-3z"/><circle cx="15" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg>
+        Categories &amp; Tags
+      </a>
+      <a class="side-nav-link" href="{% url 'admin:index' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        Admin
+      </a>
+    </nav>
+    {% endwith %}
+
+    <div class="side-nav-profile">
+      <span class="side-nav-avatar">{{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}</span>
+      <span class="side-nav-profile-text">
+        <span class="side-nav-name">{{ request.user.get_full_name|default:request.user.username }}</span>
+        <span class="side-nav-email">{{ request.user.email }}</span>
+      </span>
+      {# Django 5+ LogoutView is POST-only — a plain link 405s. #}
+      <form class="side-nav-logout-form" method="post" action="{% url 'admin:logout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'kb:article-list' %}">
+        <button type="submit" class="side-nav-logout" aria-label="Log out" title="Log out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </form>
+    </div>
+  </aside>
+{% endif %}
+
+<header class="site-header">
+  <div class="wrap">
+    {% if request.user.is_superuser %}
+      <button type="button" id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="sideNav">
+        <span class="sidebar-toggle-bars" aria-hidden="true"></span>
+      </button>
+    {% endif %}
+    <a class="brand" href="{% url 'kb:article-list' %}">{% if site_settings.logo %}<img src="{{ site_settings.logo.url }}" alt="{{ site_settings.site_name }}" class="brand-logo">{% else %}{{ site_settings.site_name }}{% endif %}</a>
+    <form class="search-form" action="{% url 'kb:article-list' %}" method="get">
+      <input type="search" name="q" placeholder="Search, e.g. &quot;how do I reset my password&quot;" value="{{ query|default:'' }}">
+      <button type="submit">Search</button>
+    </form>
+    {% comment %}
+      Header auth block. Three states — and the line between the last
+      two is the one to get right, because "staff" and "customer" are
+      decided by Django's is_staff flag and nothing else:
+
+        1. Anonymous — a Log in link carrying ?next=<here>, so a reader
+           comes back to the article they were on. /login/ is the
+           password form by default, or, with SSO enabled, a page that
+           links out to the identity provider (accounts/views.py's
+           module docstring explains both).
+
+        2. Customer — any signed-in account without is_staff. Their
+           organisations (accounts.Membership, supplied by the
+           user_organisations context processor) are shown next to their
+           name because that is what their tickets are scoped to: someone
+           in two organisations needs to see both before raising a
+           ticket. A customer in no organisation is still a customer (they
+           can raise organisation-less tickets) and just shows no names.
+
+        3. Support agent — an is_staff/is_superuser account. They work
+           every organisation's tickets and belong to none of them, so no
+           organisation is shown.
+
+      A superuser also has the authoring sidebar and its own log-out
+      control, so they see two. That is left alone on purpose: a
+      non-superuser support agent gets no sidebar and still needs this
+      one, and special-casing the overlap would make the header stop
+      matching the three states above for the sake of one duplicate
+      button.
+
+      Log out is the same POST form in both signed-in states:
+      accounts:logout is @require_POST (a GET logout is CSRF-able and
+      pre-fetchable, and it flushes the session server-side, which
+      matters on shared workstations), so it needs a real form, not a
+      link.
+    {% endcomment %}
+    {% if not request.user.is_authenticated %}
+    <div class="nav-auth">
+      <a class="btn-nav" href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Log in</a>
+    </div>
+    {% elif not request.user.is_staff %}
+    <div class="nav-auth">
+      <span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}{% if user_organisations %} &middot; {{ user_organisations|join:", " }}{% endif %}</span>
+      {# TICKETS_URL, not {% url 'tickets:list' %} — reverse() only ever #}
+      {# yields a path, so it cannot cross from a help host to a separate #}
+      {# ticket host. #}
+      {# See kb/context_processors.py::tickets_url. #}
+      <a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>
+      <form class="nav-auth-logout-form" method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-nav">Log out</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="nav-auth">
+      <span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}</span>
+      <a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>
+      <form class="nav-auth-logout-form" method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-nav">Log out</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</header>
+
+{% comment %}
+  Page-level nav strip, empty on every KB page. It exists so that
+  tickets/base.html can extend this template for the site header,
+  brand, search and auth block, and add its own row of controls (Open /
+  Resolved, New ticket) underneath — rather than copying the whole
+  header into a second base template that would then drift out of sync
+  with this one the first time the auth block changes.
+{% endcomment %}
+{% block page_nav %}{% endblock %}
+
+<main class="wrap site-main">
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+  </ul>
+{% endif %}
+{% block content %}{% endblock %}
+</main>
+
+{% comment %}
+  Footer, shown to everyone. Everything in it comes from the
+  SiteSettings singleton (branding app), so a self-hoster changes it in
+  Django Admin rather than by editing this template.
+{% endcomment %}
+<footer class="site-footer">
+  <div class="wrap">
+    <p>{{ site_settings.site_name }} — knowledge base and support desk.</p>
+    {% if site_settings.support_email %}
+    <p>Need help? Contact us at <a href="mailto:{{ site_settings.support_email }}">{{ site_settings.support_email }}</a>.</p>
+    {% endif %}
+  </div>
+</footer>
+
+{% if request.user.is_superuser %}
+<script>
+(function () {
+  // Vanilla JS, no dependency — matches this app's no-build-step approach.
+  // Only relevant below the ~900px breakpoint: above it .side-nav is
+  // always visible via CSS and #sidebarToggle is hidden, so this never runs.
+  var toggle = document.getElementById('sidebarToggle');
+  var sideNav = document.getElementById('sideNav');
+  var overlay = document.getElementById('sideNavOverlay');
+  if (!toggle || !sideNav) { return; }
+
+  function closeNav() {
+    sideNav.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (overlay) { overlay.classList.remove('visible'); }
+  }
+  function openNav() {
+    sideNav.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+    if (overlay) { overlay.classList.add('visible'); }
+  }
+
+  toggle.addEventListener('click', function () {
+    if (sideNav.classList.contains('open')) { closeNav(); } else { openNav(); }
+  });
+  if (overlay) { overlay.addEventListener('click', closeNav); }
+  Array.prototype.forEach.call(sideNav.querySelectorAll('a'), function (link) {
+    link.addEventListener('click', closeNav);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { closeNav(); }
+  });
+}());
+</script>
+{% endif %}
+
+{% block extra_body %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "kb/base.html" %}
+
+{% block title %}Editing {{ item_type }} — {{ site_settings.site_name }}{% endblock %}
+{% block meta_description %}{% endblock %}
+
+{% block content %}
+<div class="article-editor taxonomy-item-editor">
+  <nav class="breadcrumb"><a href="{% url 'kb:taxonomy-manage' %}">Categories &amp; Tags</a> / Edit {{ item_type }}</nav>
+
+  <h1>Editing {{ item_type }}</h1>
+
+  <p class="editor-meta">
+    Scope: <strong>{% if item.org_id %}Org {{ item.org_id }}{% else %}the site's own public Help Centre{% endif %}</strong>
+    — set automatically when this {{ item_type }} was created, not editable here.
+  </p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="field {% if form.name.errors %}has-error{% endif %}">
+      {{ form.name.label_tag }}
+      {{ form.name }}
+      {% if form.name.errors %}<p class="field-error">{{ form.name.errors|join:", " }}</p>{% endif %}
+    </div>
+
+    {% if form.visibility %}
+    <div class="field {% if form.visibility.errors %}has-error{% endif %}">
+      {{ form.visibility.label_tag }}
+      {{ form.visibility }}
+      {% if form.visibility.errors %}<p class="field-error">{{ form.visibility.errors|join:", " }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    {# Guarded like visibility above: this template also backs TagForm, which has neither field. #}
+    {% if form.sort_order %}
+    <div class="field {% if form.sort_order.errors %}has-error{% endif %}">
+      {{ form.sort_order.label_tag }}
+      {{ form.sort_order }}
+      {% if form.sort_order.help_text %}<p class="field-hint">{{ form.sort_order.help_text }}</p>{% endif %}
+      {% if form.sort_order.errors %}<p class="field-error">{{ form.sort_order.errors|join:", " }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="editor-actions">
+      <button type="submit" class="btn-nav">Save changes</button>
+      <a href="{{ cancel_url }}" class="btn-nav btn-nav-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

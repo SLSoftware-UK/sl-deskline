@@ -1,0 +1,6 @@
+<p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+<p>Your ticket "<strong>{{ ticket.subject }}</strong>" has been resolved.</p>
+<p><a href="{{ ticket_url }}">View your ticket</a></p>
+
+<p>&mdash; {{ site_settings.site_name }}</p>
+{% if site_settings.support_email %}<p>Need help? Contact us at <a href="mailto:{{ site_settings.support_email }}">{{ site_settings.support_email }}</a>.</p>{% endif %}

@@ -1,0 +1,49 @@
+{% comment %}
+  Swapped on its own by staff status/assignment changes (hx-target),
+  and out-of-band after a reply (conversation.html), since a customer
+  reply can move the status.
+{% endcomment %}
+<section id="ticket-meta" class="ticket-meta"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <dl>
+    <div><dt>Status</dt><dd><span class="ticket-status ticket-status-{{ ticket.status }}">{{ ticket.get_status_display }}</span></dd></div>
+    <div><dt>Organisation</dt><dd>{{ ticket.organisation.name|default:"—" }}</dd></div>
+    <div><dt>Urgency</dt><dd><span class="urgency urgency-{{ ticket.urgency }}">{{ ticket.get_urgency_display }}</span></dd></div>
+    <div><dt>Raised by</dt><dd>{{ ticket.raised_by.get_full_name|default:ticket.raised_by.email }}</dd></div>
+    <div><dt>Assigned to</dt><dd>{% if ticket.assigned_to %}{{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.email }}{% else %}—{% endif %}</dd></div>
+    {% comment %}
+      The KB article this ticket was raised from, if any. Only linked
+      while it is still published — an archived or draft article's URL
+      would 404 for a customer, so the title is shown as plain text
+      instead of a dead link (views.py::_linked_article resolves it
+      defensively; linked_article_id is not an FK).
+    {% endcomment %}
+    {% if linked_article %}
+    <div><dt>Article</dt><dd>{% if linked_article.status == "published" %}<a href="{% url 'kb:article-detail' linked_article.slug %}">{{ linked_article.title }}</a>{% else %}{{ linked_article.title }}{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+
+  {% if staff_form %}
+  {% comment %}
+    Support-agent controls. Any change to either select posts the whole
+    form (hx-trigger=change). Without JS, the Save button in <noscript>
+    does the same as a plain POST + redirect. "Assign to me" posts the
+    current user's id for assigned_to (hx-vals overrides the select's
+    value, and the button's own name/value does it for the no-JS path).
+  {% endcomment %}
+  <form class="staff-controls" method="post" action="{% url 'tickets:update' ticket.pk %}"
+        hx-post="{% url 'tickets:update' ticket.pk %}" hx-target="#ticket-meta" hx-swap="outerHTML" hx-trigger="change">
+    {% csrf_token %}
+    <span class="staff-controls-label">Support</span>
+    <label>Status {{ staff_form.status }}</label>
+    <label>{{ staff_form.assigned_to.label }} {{ staff_form.assigned_to }}</label>
+    {% if not ticket.assigned_to_id %}
+      <button type="submit" name="assigned_to" value="{{ request.user.pk }}" class="link-button"
+              hx-post="{% url 'tickets:update' ticket.pk %}" hx-vals='{"assigned_to": "{{ request.user.pk }}"}'>Assign to me</button>
+    {% endif %}
+    <noscript><button type="submit" class="btn-nav btn-nav-secondary">Save</button></noscript>
+    {% if staff_form.errors %}
+      <p class="field-error">{% for field, errs in staff_form.errors.items %}{{ errs|join:" " }} {% endfor %}</p>
+    {% endif %}
+  </form>
+  {% endif %}
+</section>

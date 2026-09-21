@@ -1,0 +1,69 @@
+{% extends "tickets/base.html" %}
+
+{% block tickets_content %}
+<div class="tickets-header">
+  <h1>{{ title }}</h1>
+  {% if not resolved and not request.user.is_staff %}<a class="btn-nav" href="{% url 'tickets:create' %}">Raise a ticket</a>{% endif %}
+</div>
+
+{% if not resolved %}
+{% comment %}
+  Status filter, open statuses only — resolved has its own screen (see
+  views.py::_ticket_list). The hidden ordering field carries the current
+  sort through the filter submit, so filtering doesn't silently reset
+  the column the reader chose.
+{% endcomment %}
+<form method="get" class="tickets-filter">
+  <input type="hidden" name="ordering" value="{{ ordering }}">
+  <label>Status
+    <select name="status" onchange="this.form.submit()">
+      <option value="">All open</option>
+      {% for value, label in status_choices %}
+      <option value="{{ value }}"{% if value == status_filter %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit" class="btn-nav btn-nav-secondary">Filter</button></noscript>
+</form>
+{% endif %}
+
+{% if tickets %}
+<div class="table-scroll">
+<table class="ticket-table">
+  <thead>
+    <tr>
+      {% for col in columns %}
+      <th>
+        <a class="sort-header{% if col.active %} sort-header-active{% endif %}"
+           href="?ordering={{ col.next_ordering }}{% if status_filter %}&amp;status={{ status_filter }}{% endif %}">
+          {{ col.label }}{% if col.active %} <span class="sort-arrow">{% if col.descending %}▼{% else %}▲{% endif %}</span>{% endif %}
+        </a>
+      </th>
+      {% endfor %}
+      {% if not resolved %}<th>Status</th>{% endif %}
+      <th>Assigned to</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tickets %}
+    <tr>
+      <td>
+        <a href="{% url 'tickets:detail' t.pk %}">{{ t.subject }}</a>
+        <span class="muted">#{{ t.pk }} · {{ t.message_count }} message{{ t.message_count|pluralize }}</span>
+      </td>
+      {# Organisation column is support-agent only — it must stay in step #}
+      {# with views.py::_SORT_COLUMNS, which drops the same header. #}
+      {% if request.user.is_staff %}<td>{{ t.organisation.name|default:"—" }}</td>{% endif %}
+      <td><span class="urgency urgency-{{ t.urgency }}">{{ t.get_urgency_display }}</span></td>
+      <td>{{ t.updated_at|date:"j M Y, H:i" }}</td>
+      {% if not resolved %}<td><span class="ticket-status ticket-status-{{ t.status }}">{{ t.get_status_display }}</span></td>{% endif %}
+      <td>{% if t.assigned_to %}{{ t.assigned_to.get_full_name|default:t.assigned_to.email }}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty-state">{% if resolved %}No resolved tickets yet.{% else %}No tickets yet.{% endif %}</p>
+{% endif %}
+{% endblock %}

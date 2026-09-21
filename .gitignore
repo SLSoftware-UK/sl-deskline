@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+activate.bat
+activate.ps1
+.env
+# db.sqlite3-shm/-wal are WAL-mode sidecars that exist whenever a
+# connection is open (see backend/support_core/db.py) -- the trailing
+# `*` also still matches the plain db.sqlite3 file above it.
+db.sqlite3*
+staticfiles/
+media/
+.DS_Store
+Thumbs.db
+*.log
+.superpowers/
+# graphify's own output for this repo -- maintainer-local tooling, not
+# part of the project.
+graphify-out/

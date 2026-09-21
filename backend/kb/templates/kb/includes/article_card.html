@@ -1,0 +1,7 @@
+{# One article card. `show_category` adds the category badge -- wanted in flat (filtered/search) results, redundant inside a category's own section on the home page. #}
+<a class="article-card" href="{% url 'kb:article-detail' article.slug %}">
+  {% if show_category %}<span class="badge">{{ article.category.name }}</span>{% endif %}
+  <h3>{{ article.title }}</h3>
+  <p>{{ article.summary|truncatewords:24 }}</p>
+  <span class="meta">{{ article.helpful_count }} found this helpful</span>
+</a>

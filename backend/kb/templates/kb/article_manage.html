@@ -1,0 +1,60 @@
+{% extends "kb/base.html" %}
+
+{% block title %}Manage articles — {{ site_settings.site_name }}{% endblock %}
+{% block meta_description %}{% endblock %}
+
+{% block content %}
+<div class="article-manage">
+  <div class="manage-header">
+    <h1>Manage articles</h1>
+    <a class="btn-nav" href="{% url 'kb:article-create' %}">+ New Article</a>
+  </div>
+
+  {% if page_obj.object_list %}
+  <table class="manage-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Category</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for article in page_obj.object_list %}
+      <tr>
+        <td>{{ article.title }}</td>
+        <td><span class="status-badge status-{{ article.status }}">{{ article.get_status_display }}</span></td>
+        <td>{{ article.category.name }}</td>
+        <td>{{ article.updated_at|date:"j M Y, H:i" }}</td>
+        <td class="manage-row-actions">
+          <a href="{% url 'kb:article-edit' article.slug %}">Edit</a>
+          {% if article.status == 'published' %}
+            · <a href="{% url 'kb:article-detail' article.slug %}" target="_blank" rel="noopener">View ↗</a>
+          {% endif %}
+          ·
+          <form method="post" action="{% url 'kb:article-delete' article.slug %}" class="inline-delete-form"
+                onsubmit="return confirm('Delete \'{{ article.title|escapejs }}\'? This can\'t be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="link-button">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="pagination">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <p>No articles yet. <a href="{% url 'kb:article-create' %}">Write the first one</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2,8 +2,7 @@
 
 SL Deskline is a self-hosted knowledge base and support ticket desk in one Django service. The knowledge base is public, server-rendered and search-engine friendly: categories, tags, full-text search, "Was this helpful?" ratings, SEO metadata and a Markdown editor with image uploads. The ticket desk sits behind a login: customers in one or more organisations raise tickets, and your support agents work the queue, with email notifications both ways. Sign-in is plain Django auth out of the box, with an optional code-exchange SSO hook for plugging it into your own product's accounts. There is no JavaScript build step: pages are Django templates plus a little htmx.
 
-<!-- screenshot: docs/screenshot.png -->
-_Screenshots coming soon._
+**See it live:** the knowledge-base side runs in production at [help.telosgym.com](https://help.telosgym.com/).
 
 ## Self-hosting: one container, one volume
 

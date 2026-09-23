@@ -446,3 +446,24 @@ a { color: var(--accent); }
 @media (max-width: 899px) {
   body.has-sidebar .sidebar-toggle { display: inline-flex; }
 }
+
+/* Optional comment after a vote (kb/includes/rating_result.html). */
+.rating-widget form.rating-comment-form { flex-direction: column; align-items: flex-start; gap: 8px; }
+.rating-comment-form label { font-weight: 500; font-size: 0.9rem; }
+.rating-comment-form .optional { color: var(--muted); font-weight: 400; }
+.rating-comment-form textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.95rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); resize: vertical;
+}
+.rating-comment-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Settings + Feedback pages. */
+.settings-form h2 { font-size: 1.05rem; margin: 8px 0 16px; }
+.field-checkbox label { display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+.field-checkbox input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+.field-checkbox .field-hint { margin-left: 28px; }
+.feedback-summary { color: var(--muted); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.feedback-filter { display: flex; gap: 16px; margin: 0 0 16px; font-size: 0.9rem; }
+.feedback-filter a { color: var(--muted); text-decoration: none; padding-bottom: 2px; }
+.feedback-filter a.active { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--accent); }
+.feedback-comment { max-width: 420px; white-space: normal; }

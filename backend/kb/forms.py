@@ -19,7 +19,7 @@ authoring.
 """
 from django import forms
 
-from .models import Article, Category, Tag
+from .models import Article, Category, Tag, KBSettings
 
 
 class ArticleForm(forms.ModelForm):
@@ -82,3 +82,9 @@ class TagForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['name'].widget.attrs.setdefault('autofocus', True)
+
+
+class KBSettingsForm(forms.ModelForm):
+    class Meta:
+        model = KBSettings
+        fields = ['ratings_enabled', 'show_helpful_count']

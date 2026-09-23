@@ -55,3 +55,13 @@ def help_url(request):
     if is_ticket_host(request):
         return {'HELP_URL': settings.SITE_URL.rstrip('/') + '/'}
     return {'HELP_URL': '/'}
+
+
+def kb_settings(request):
+    """KB_SETTINGS for every template (article cards, the rating widget).
+    Lazy, so pages that never look at it — ticket pages, admin — don't
+    pay for the query."""
+    from django.utils.functional import SimpleLazyObject
+
+    from .models import KBSettings
+    return {'KB_SETTINGS': SimpleLazyObject(KBSettings.load)}

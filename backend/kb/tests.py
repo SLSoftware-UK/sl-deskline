@@ -1183,3 +1183,150 @@ class HeaderUsernameTests(TestCase):
         html = self.client.get(reverse('kb:article-list')).content.decode()
         self.assertIn('class="nav-username"', html)
         self.assertNotIn('class="side-nav-name"', html)
+
+
+class RatingSettingsAndFeedbackTests(TestCase):
+    """KBSettings switches, the optional comment after a vote, and the
+    superuser Settings / Feedback pages."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth import get_user_model as _gum
+        from django.utils import timezone as _tz
+
+        from kb.models import Article as _Article, Category as _Category
+
+        cls.User = _gum()
+        cls.category = _Category.objects.create(name='Feedback tests')
+        cls.article = _Article.objects.create(
+            title='Rating widget article', category=cls.category,
+            summary='Summary.', body='Body.', status=_Article.STATUS_PUBLISHED,
+            published_at=_tz.now(), author_user_id=1, author_display_name='Ed',
+        )
+        cls.reader = cls.User.objects.create_user('reader-1', 'reader@example.com', 'pw', first_name='Rhea')
+        cls.boss = cls.User.objects.create_superuser('boss', 'boss@example.com', 'pw')
+
+    def _detail(self):
+        from django.urls import reverse as _r
+        return self.client.get(_r('kb:article-detail', args=[self.article.slug]) + '?_sso_checked=1')
+
+    def _vote(self, helpful='no'):
+        from django.urls import reverse as _r
+        return self.client.post(
+            _r('kb:article-rate', args=[self.article.slug]), {'helpful': helpful},
+            headers={'hx-request': 'true'},
+        )
+
+    def _comment(self, text):
+        from django.urls import reverse as _r
+        return self.client.post(
+            _r('kb:article-rate-comment', args=[self.article.slug]), {'comment': text},
+            headers={'hx-request': 'true'},
+        )
+
+    def _set(self, **kwargs):
+        from kb.models import KBSettings
+        obj = KBSettings.load()
+        for k, v in kwargs.items():
+            setattr(obj, k, v)
+        obj.save()
+
+    def test_defaults_are_on(self):
+        from kb.models import KBSettings
+        s = KBSettings.load()
+        self.assertTrue(s.ratings_enabled)
+        self.assertTrue(s.show_helpful_count)
+        self.assertEqual(s.pk, 1)
+
+    def test_vote_offers_comment_box_and_comment_is_stored_once(self):
+        self.client.force_login(self.reader)
+        html = self._vote('no').content.decode()
+        self.assertIn('name="comment"', html)
+        self.assertIn('What were you looking for', html)
+
+        html = self._comment('  Needed the steps for iOS.  ').content.decode()
+        self.assertIn("got your comment", html)
+        rating = self.article.ratings.get()
+        self.assertFalse(rating.is_helpful)
+        self.assertEqual(rating.comment, 'Needed the steps for iOS.')
+
+        self._comment('Second go')
+        rating.refresh_from_db()
+        self.assertEqual(rating.comment, 'Needed the steps for iOS.')
+
+    def test_comment_without_a_vote_saves_nothing(self):
+        self.client.force_login(self.reader)
+        self.assertEqual(self._comment('Hello').status_code, 200)
+        self.assertFalse(self.article.ratings.exists())
+
+    def test_comment_is_truncated(self):
+        from kb.models import RATING_COMMENT_MAX_LENGTH
+        self.client.force_login(self.reader)
+        self._vote('yes')
+        self._comment('x' * (RATING_COMMENT_MAX_LENGTH + 50))
+        self.assertEqual(len(self.article.ratings.get().comment), RATING_COMMENT_MAX_LENGTH)
+
+    def test_ratings_off_hides_widget_and_refuses_votes(self):
+        self._set(ratings_enabled=False)
+        self.client.force_login(self.reader)
+        self.assertNotIn('id="rating-widget"', self._detail().content.decode())
+        self.assertEqual(self._vote('yes').status_code, 404)
+        self.assertEqual(self._comment('hi').status_code, 404)
+        self.assertFalse(self.article.ratings.exists())
+
+    def test_ratings_on_shows_widget(self):
+        self.client.force_login(self.reader)
+        self.assertIn('id="rating-widget"', self._detail().content.decode())
+
+    def test_helpful_count_toggle(self):
+        from django.urls import reverse as _r
+        self.client.force_login(self.reader)
+        url = _r('kb:article-list') + '?_sso_checked=1'
+        self.assertIn('found this helpful', self.client.get(url).content.decode())
+        self._set(show_helpful_count=False)
+        self.assertNotIn('found this helpful', self.client.get(url).content.decode())
+
+    def test_settings_page_is_superuser_only_and_saves(self):
+        from django.urls import reverse as _r
+
+        from kb.models import KBSettings
+        self.client.force_login(self.reader)
+        self.assertEqual(self.client.get(_r('kb:settings')).status_code, 302)
+        self.client.force_login(self.boss)
+        self.assertEqual(self.client.get(_r('kb:settings')).status_code, 200)
+        # Unticked checkboxes are simply absent from the POST.
+        self.client.post(_r('kb:settings'), {'ratings_enabled': 'on'})
+        s = KBSettings.load()
+        self.assertTrue(s.ratings_enabled)
+        self.assertFalse(s.show_helpful_count)
+
+    def test_feedback_page_lists_comments_with_reader(self):
+        from django.urls import reverse as _r
+        from kb.models import Rating
+        Rating.objects.create(article=self.article, user_id=self.reader.id, is_helpful=False, comment='Missing a screenshot')
+        Rating.objects.create(article=self.article, anon_token='abc', is_helpful=True)
+
+        self.client.force_login(self.reader)
+        self.assertEqual(self.client.get(_r('kb:feedback')).status_code, 302)
+
+        self.client.force_login(self.boss)
+        html = self.client.get(_r('kb:feedback')).content.decode()
+        self.assertIn('Missing a screenshot', html)
+        self.assertIn('Rhea', html)
+        self.assertNotIn('Anonymous', html)  # the comment-less vote is filtered out
+        html = self.client.get(_r('kb:feedback') + '?all=1').content.decode()
+        self.assertIn('Anonymous', html)
+
+    def test_sidebar_links(self):
+        from django.urls import reverse as _r
+        self.client.force_login(self.boss)
+        html = self.client.get(_r('kb:feedback')).content.decode()
+        self.assertIn(f'class="side-nav-link active" href="{_r("kb:feedback")}"', html)
+        self.assertIn(f'href="{_r("kb:settings")}"', html)
+
+    def test_anonymous_reader_can_comment_via_cookie(self):
+        self._vote('yes')
+        self._comment('Great, thanks')
+        rating = self.article.ratings.get()
+        self.assertIsNone(rating.user_id)
+        self.assertEqual(rating.comment, 'Great, thanks')

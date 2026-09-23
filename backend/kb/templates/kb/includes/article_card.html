@@ -3,5 +3,5 @@
   {% if show_category %}<span class="badge">{{ article.category.name }}</span>{% endif %}
   <h3>{{ article.title }}</h3>
   <p>{{ article.summary|truncatewords:24 }}</p>
-  <span class="meta">{{ article.helpful_count }} found this helpful</span>
+  {% if KB_SETTINGS.show_helpful_count %}<span class="meta">{{ article.helpful_count }} found this helpful</span>{% endif %}
 </a>

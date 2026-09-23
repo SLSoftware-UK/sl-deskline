@@ -17,6 +17,11 @@ urlpatterns = [
 
     path('articles/<slug:slug>/', views.article_detail, name='article-detail'),
     path('articles/<slug:slug>/rate/', views.rate_article, name='article-rate'),
+    path('articles/<slug:slug>/rate/comment/', views.rate_comment, name='article-rate-comment'),
+
+    # Reader feedback: the switches and what readers said.
+    path('settings/', views.kb_settings, name='settings'),
+    path('feedback/', views.feedback, name='feedback'),
 
     # Category / Tag authoring.
     path('taxonomy/', views.taxonomy_manage, name='taxonomy-manage'),

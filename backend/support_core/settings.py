@@ -226,6 +226,9 @@ TEMPLATES = [
                 'kb.context_processors.site_url',
                 'kb.context_processors.tickets_url',
                 'kb.context_processors.help_url',
+                #   kb_settings: KB_SETTINGS (rating widget / helpful-count
+                #                switches, kb.models.KBSettings).
+                'kb.context_processors.kb_settings',
                 #   user_organisations: the signed-in customer's
                 #                organisations, shown next to their name
                 #                in the header.

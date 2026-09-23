@@ -144,7 +144,8 @@
     </div>
     {% elif not request.user.is_staff %}
     <div class="nav-auth">
-      <span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}{% if user_organisations %} &middot; {{ user_organisations|join:", " }}{% endif %}</span>
+      {# Superusers already see their name in the sidebar profile chip. #}
+      {% if not request.user.is_superuser %}<span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}{% if user_organisations %} &middot; {{ user_organisations|join:", " }}{% endif %}</span>{% endif %}
       {# TICKETS_URL, not {% url 'tickets:list' %} — reverse() only ever #}
       {# yields a path, so it cannot cross from a help host to a separate #}
       {# ticket host. #}
@@ -160,7 +161,8 @@
     </div>
     {% else %}
     <div class="nav-auth">
-      <span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}</span>
+      {# Superusers already see their name in the sidebar profile chip. #}
+      {% if not request.user.is_superuser %}<span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}</span>{% endif %}
       {% if request.resolver_match.app_name == 'tickets' %}<a class="btn-nav btn-nav-secondary" href="{{ HELP_URL }}">Help</a>{% else %}<a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>{% endif %}
       <form class="nav-auth-logout-form" method="post" action="{% url 'accounts:logout' %}">
         {% csrf_token %}

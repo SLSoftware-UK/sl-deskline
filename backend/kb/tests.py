@@ -1161,3 +1161,25 @@ class Fts5SearchVisibilityTests(TestCase):
         self.assertIn('Public zebra guide', html)
         self.assertIn('Members zebra runbook', html)
         self.assertNotIn('Draft zebra guide', html)
+
+
+class HeaderUsernameTests(TestCase):
+    """The header name is redundant next to the superuser sidebar's
+    profile chip, but it is the only place anyone else sees who they
+    are signed in as."""
+
+    def test_hidden_for_superuser(self):
+        self.client.force_login(
+            get_user_model().objects.create_superuser('ed', 'ed@example.com', 'pw')
+        )
+        html = self.client.get(reverse('kb:article-list')).content.decode()
+        self.assertNotIn('class="nav-username"', html)
+        self.assertIn('class="side-nav-name"', html)
+
+    def test_shown_for_non_superuser_staff(self):
+        self.client.force_login(
+            get_user_model().objects.create_user('agent', 'a@example.com', 'pw', is_staff=True)
+        )
+        html = self.client.get(reverse('kb:article-list')).content.decode()
+        self.assertIn('class="nav-username"', html)
+        self.assertNotIn('class="side-nav-name"', html)

@@ -220,8 +220,12 @@ TEMPLATES = [
                 #   tickets_url: the header's "Tickets" link, which must
                 #                cross to the ticket host when the page
                 #                is being served on the help host.
+                #   help_url:    its twin — the way back to the KB from
+                #                a ticket host, whose bare `/` redirects
+                #                to /tickets/.
                 'kb.context_processors.site_url',
                 'kb.context_processors.tickets_url',
+                'kb.context_processors.help_url',
                 #   user_organisations: the signed-in customer's
                 #                organisations, shown next to their name
                 #                in the header.

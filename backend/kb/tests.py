@@ -1,8 +1,10 @@
 import io
 import json
+import re
 import shutil
 import tempfile
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
@@ -17,7 +19,7 @@ from markdownx.settings import MARKDOWNX_MEDIA_PATH
 from PIL import Image
 
 from accounts.models import Membership, Organisation
-from kb.context_processors import tickets_url
+from kb.context_processors import help_url, tickets_url
 from kb.image_cleanup import purge_orphaned_markdown_images
 from kb.models import Article, ArticlePhoto, ArticleStep, Category, FeaturedArticle
 from kb.validators import validate_image_size
@@ -52,11 +54,14 @@ class AuthoringSidebarTests(TestCase):
         self.assertEqual(self._active_hrefs(reverse('kb:article-list')), set())
 
     def test_sidebar_links_only_to_this_service(self):
-        # Every sidebar link is a same-origin path — the sidebar has no
-        # cross-links out to other services.
+        # The sidebar has no cross-links out to other services. The one
+        # absolute link is Tickets (TICKETS_URL), which is this same
+        # service on its ticket origin — TICKET_SITE_URL.
         html = self.client.get(reverse('kb:article-manage')).content.decode()
         sidebar = html[html.index('<aside id="sideNav"'):html.index('</aside>')]
-        self.assertNotIn('href="http', sidebar)
+        absolute = re.findall(r'href="(https?://[^"]*)"', sidebar)
+        own = (settings.SITE_URL.rstrip('/') + '/', settings.TICKET_SITE_URL.rstrip('/') + '/')
+        self.assertEqual([u for u in absolute if not u.startswith(own)], [])
 
     def test_logout_is_a_post_form(self):
         # Django 5+ LogoutView rejects GET with 405, so the sidebar must POST.
@@ -242,6 +247,67 @@ class TicketsUrlContextProcessorTests(TestCase):
         # only way to exercise the header on that host.
         on_ticket = self.client.get(path, headers={'host': 'support.example.com'}).content.decode()
         self.assertIn('href="/tickets/">Tickets</a>', on_ticket)
+
+
+@override_settings(
+    TICKET_HOSTS=['support.example.com'],
+    TICKET_SITE_URL='https://support.example.com',
+    SITE_URL='https://help.example.com',
+    ALLOWED_HOSTS=['help.example.com', 'support.example.com', 'testserver'],
+)
+class HelpUrlCrossLinkTests(TestCase):
+    """The way back from a ticket host to the KB. Its bare `/` is
+    redirected to /tickets/, so every "go to Help" link on that host --
+    brand, search, header button, sidebar -- has to be absolute."""
+
+    def test_relative_on_the_help_host(self):
+        request = RequestFactory(headers={'host': 'help.example.com'}).get('/')
+        self.assertEqual(help_url(request), {'HELP_URL': '/'})
+
+    def test_absolute_on_a_ticket_host(self):
+        request = RequestFactory(headers={'host': 'support.example.com'}).get('/')
+        self.assertEqual(help_url(request), {'HELP_URL': 'https://help.example.com/'})
+
+    def test_superuser_sidebar_links_both_halves_from_either_host(self):
+        self.client.force_login(
+            get_user_model().objects.create_superuser('ed', 'ed@example.com', 'pw')
+        )
+        on_help = self.client.get(
+            reverse('kb:article-manage'), headers={'host': 'help.example.com'},
+        ).content.decode()
+        self.assertIn('class="side-nav-link" href="https://support.example.com/tickets/"', on_help)
+
+        on_ticket = self.client.get(
+            reverse('tickets:list'), headers={'host': 'support.example.com'},
+        ).content.decode()
+        self.assertIn('class="side-nav-link active" href="/tickets/"', on_ticket)
+        self.assertIn('class="side-nav-link" href="https://help.example.com/"', on_ticket)
+
+    def test_search_and_brand_on_ticket_host_go_to_the_help_host(self):
+        self.client.force_login(
+            get_user_model().objects.create_user('agent', 'a@example.com', 'pw', is_staff=True)
+        )
+        html = self.client.get(
+            reverse('tickets:list'), headers={'host': 'support.example.com'},
+        ).content.decode()
+        self.assertIn('<a class="brand" href="https://help.example.com/">', html)
+        self.assertIn('<form class="search-form" action="https://help.example.com/"', html)
+
+    def test_header_button_offers_the_other_half(self):
+        self.client.force_login(
+            get_user_model().objects.create_user('agent', 'a@example.com', 'pw', is_staff=True)
+        )
+        on_tickets = self.client.get(
+            reverse('tickets:list'), headers={'host': 'support.example.com'},
+        ).content.decode()
+        self.assertIn('href="https://help.example.com/">Help</a>', on_tickets)
+        self.assertNotIn('>Tickets</a>', on_tickets)
+
+        on_kb = self.client.get(
+            reverse('kb:article-list'), headers={'host': 'help.example.com'},
+        ).content.decode()
+        self.assertIn('href="https://support.example.com/tickets/">Tickets</a>', on_kb)
+        self.assertNotIn('>Help</a>', on_kb)
 
 
 class HeaderAuthBlockTests(TestCase):

@@ -39,10 +39,20 @@
   {% endcomment %}
   <div id="sideNavOverlay" class="side-nav-overlay"></div>
   <aside id="sideNav" class="side-nav" aria-label="{{ site_settings.site_name }} authoring menu">
-    <a class="side-nav-brand" href="{% url 'kb:article-list' %}">{{ site_settings.site_name }}</a>
+    <a class="side-nav-brand" href="{{ HELP_URL }}">{{ site_settings.site_name }}</a>
 
     {% with nav=request.resolver_match.url_name %}
     <nav class="side-nav-section">
+      {# HELP_URL / TICKETS_URL rather than {% url %} — each may have to #}
+      {# cross to the other hostname (kb/context_processors.py). #}
+      <a class="side-nav-link{% if nav == 'article-list' %} active{% endif %}" href="{{ HELP_URL }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Help Centre
+      </a>
+      <a class="side-nav-link{% if request.resolver_match.app_name == 'tickets' %} active{% endif %}" href="{{ TICKETS_URL }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4z"/><line x1="13" y1="5" x2="13" y2="19" stroke-dasharray="2 2"/></svg>
+        Tickets
+      </a>
       <a class="side-nav-link{% if nav == 'article-create' %} active{% endif %}" href="{% url 'kb:article-create' %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Article
@@ -87,8 +97,8 @@
         <span class="sidebar-toggle-bars" aria-hidden="true"></span>
       </button>
     {% endif %}
-    <a class="brand" href="{% url 'kb:article-list' %}">{% if site_settings.logo %}<img src="{{ site_settings.logo.url }}" alt="{{ site_settings.site_name }}" class="brand-logo">{% else %}{{ site_settings.site_name }}{% endif %}</a>
-    <form class="search-form" action="{% url 'kb:article-list' %}" method="get">
+    <a class="brand" href="{{ HELP_URL }}">{% if site_settings.logo %}<img src="{{ site_settings.logo.url }}" alt="{{ site_settings.site_name }}" class="brand-logo">{% else %}{{ site_settings.site_name }}{% endif %}</a>
+    <form class="search-form" action="{{ HELP_URL }}" method="get">
       <input type="search" name="q" placeholder="Search, e.g. &quot;how do I reset my password&quot;" value="{{ query|default:'' }}">
       <button type="submit">Search</button>
     </form>
@@ -138,8 +148,11 @@
       {# TICKETS_URL, not {% url 'tickets:list' %} — reverse() only ever #}
       {# yields a path, so it cannot cross from a help host to a separate #}
       {# ticket host. #}
-      {# See kb/context_processors.py::tickets_url. #}
-      <a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>
+      {# See kb/context_processors.py::tickets_url. On ticket pages the #}
+      {# button flips to Help instead — the desk's own tabs are already #}
+      {# on screen, and HELP_URL is absolute on a ticket host, whose `/` #}
+      {# would bounce back to /tickets/ (context_processors.help_url). #}
+      {% if request.resolver_match.app_name == 'tickets' %}<a class="btn-nav btn-nav-secondary" href="{{ HELP_URL }}">Help</a>{% else %}<a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>{% endif %}
       <form class="nav-auth-logout-form" method="post" action="{% url 'accounts:logout' %}">
         {% csrf_token %}
         <button type="submit" class="btn-nav">Log out</button>
@@ -148,7 +161,7 @@
     {% else %}
     <div class="nav-auth">
       <span class="nav-username">{{ request.user.get_full_name|default:request.user.username }}</span>
-      <a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>
+      {% if request.resolver_match.app_name == 'tickets' %}<a class="btn-nav btn-nav-secondary" href="{{ HELP_URL }}">Help</a>{% else %}<a class="btn-nav btn-nav-secondary" href="{{ TICKETS_URL }}">Tickets</a>{% endif %}
       <form class="nav-auth-logout-form" method="post" action="{% url 'accounts:logout' %}">
         {% csrf_token %}
         <button type="submit" class="btn-nav">Log out</button>

@@ -37,3 +37,21 @@ def tickets_url(request):
     if is_ticket_host(request):
         return {'TICKETS_URL': '/tickets/'}
     return {'TICKETS_URL': settings.TICKET_SITE_URL.rstrip('/') + '/tickets/'}
+
+
+def help_url(request):
+    """The way back from tickets to the help centre — tickets_url's twin.
+
+    The brand link, the search form and the header/sidebar "Help" links
+    all used to be `{% url 'kb:article-list' %}`, i.e. a bare `/`. On a
+    ticket host that path is exactly the one TicketHostRootRedirect-
+    Middleware bounces straight back to /tickets/, so a reader on a
+    separate ticket host had no route to the KB at all (and a search
+    typed there silently landed on the ticket list, query dropped). On
+    a ticket host the link therefore has to be absolute, built on
+    settings.SITE_URL — the help host's canonical origin. Otherwise
+    (including every single-host deployment) a relative `/` is correct.
+    """
+    if is_ticket_host(request):
+        return {'HELP_URL': settings.SITE_URL.rstrip('/') + '/'}
+    return {'HELP_URL': '/'}

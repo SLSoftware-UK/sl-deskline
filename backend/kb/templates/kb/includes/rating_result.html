@@ -1,5 +1,28 @@
-{% if already_rated %}
-  <p class="rating-thanks">{% if just_voted %}Thanks for the feedback!{% else %}You've already rated this article — thanks!{% endif %}</p>
+{% comment %}
+  Four states, swapped in place by htmx inside #rating-widget:
+  comment_saved -> just_voted (offer the optional comment box) ->
+  already_rated (a later visit) -> not yet rated (the Yes/No buttons).
+{% endcomment %}
+{% if comment_saved %}
+  <p class="rating-thanks">Thanks — we've got your comment.</p>
+{% elif just_voted %}
+  <p class="rating-thanks">Thanks for the feedback!</p>
+  <form
+    class="rating-comment-form"
+    hx-post="{% url 'kb:article-rate-comment' article.slug %}"
+    hx-target="#rating-widget"
+    hx-swap="innerHTML"
+    action="{% url 'kb:article-rate-comment' article.slug %}"
+    method="post"
+  >
+    {% csrf_token %}
+    <label for="rating-comment">Anything to add? <span class="optional">(optional)</span></label>
+    <textarea id="rating-comment" name="comment" rows="3" maxlength="{{ comment_max_length }}"
+      placeholder="{% if is_helpful %}What helped most?{% else %}What were you looking for, or what could be clearer?{% endif %}"></textarea>
+    <button type="submit">Send</button>
+  </form>
+{% elif already_rated %}
+  <p class="rating-thanks">You've already rated this article — thanks!</p>
 {% else %}
   <p>Was this article helpful?</p>
   <form

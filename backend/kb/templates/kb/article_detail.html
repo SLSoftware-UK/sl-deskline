@@ -64,9 +64,11 @@
   </section>
   {% endif %}
 
+  {% if KB_SETTINGS.ratings_enabled %}
   <section id="rating-widget" class="rating-widget">
     {% include "kb/includes/rating_result.html" with already_rated=already_rated just_voted=False %}
   </section>
+  {% endif %}
 
   {% if ticket_url %}
   <section class="ticket-cta">

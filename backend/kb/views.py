@@ -14,6 +14,7 @@ import json
 import secrets
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.files.storage import default_storage
@@ -21,7 +22,7 @@ from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Case, F, FloatField, Q, Value, When
 from django.db.models.deletion import ProtectedError
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -35,10 +36,13 @@ from branding.utils import get_site_settings
 from . import search_index
 from .context_processors import tickets_url
 from .decorators import superuser_required
-from .forms import ArticleForm, CategoryForm, TagForm
+from .forms import ArticleForm, CategoryForm, KBSettingsForm, TagForm
 from .image_cleanup import purge_orphaned_markdown_images
 from .image_processing import process_photo_image
-from .models import Article, Category, Tag, Rating, FeaturedArticle, ProductShowcase
+from .models import (
+    RATING_COMMENT_MAX_LENGTH, Article, Category, FeaturedArticle, KBSettings,
+    ProductShowcase, Rating, Tag,
+)
 from .validators import max_photo_upload_bytes
 
 # The site's own public KB. Hardcoded org scope for now — see module
@@ -488,6 +492,8 @@ def rate_article(request, slug):
     deployment whose KB is read mainly by signed-in customers might
     reasonably make the opposite trade."""
     article = get_object_or_404(_published_articles(request), slug=slug)
+    if not KBSettings.load().ratings_enabled:
+        raise Http404('Ratings are switched off.')
     is_helpful = request.POST.get('helpful') == 'yes'
     set_cookie = None
 
@@ -511,6 +517,7 @@ def rate_article(request, slug):
     if request.htmx:
         response = render(request, 'kb/includes/rating_result.html', {
             'article': article, 'already_rated': True, 'just_voted': created,
+            'is_helpful': is_helpful, 'comment_max_length': RATING_COMMENT_MAX_LENGTH,
         })
     else:
         messages.success(request, 'Thanks for the feedback!' if created else 'You already rated this article.')
@@ -523,6 +530,86 @@ def rate_article(request, slug):
         )
 
     return response
+
+
+def _readers_rating(request, article):
+    """This reader's own vote on `article`, keyed the same way
+    rate_article stored it (user id if signed in, anon cookie if not)."""
+    if request.user.is_authenticated:
+        return article.ratings.filter(user_id=request.user.id).first()
+    anon_token = request.COOKIES.get(RATING_COOKIE_NAME)
+    return article.ratings.filter(anon_token=anon_token).first() if anon_token else None
+
+
+@require_POST
+def rate_comment(request, slug):
+    """The optional "Anything to add?" box shown straight after a vote.
+
+    Attaches to the reader's own vote on this article, and only once: a
+    second post, a blank one, or one with no vote behind it (no cookie,
+    someone else's article) saves nothing. There is deliberately no way
+    to comment without voting — the vote is what the comment hangs off,
+    and it is the anti-repeat key (one per user / anon token)."""
+    article = get_object_or_404(_published_articles(request), slug=slug)
+    if not KBSettings.load().ratings_enabled:
+        raise Http404('Ratings are switched off.')
+    rating = _readers_rating(request, article)
+    comment = request.POST.get('comment', '').strip()[:RATING_COMMENT_MAX_LENGTH]
+    if rating is not None and comment and not rating.comment:
+        rating.comment = comment
+        rating.save(update_fields=['comment'])
+
+    if request.htmx:
+        return render(request, 'kb/includes/rating_result.html', {
+            'article': article, 'comment_saved': True,
+        })
+    messages.success(request, 'Thanks for the feedback!')
+    return redirect('kb:article-detail', slug=slug)
+
+
+@superuser_required
+def kb_settings(request):
+    """The reader-feedback switches (kb.models.KBSettings)."""
+    form = KBSettingsForm(request.POST or None, instance=KBSettings.load())
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Settings saved.')
+        return redirect('kb:settings')
+    return render(request, 'kb/kb_settings.html', {
+        'form': form,
+        'meta_title': f'Settings — {_site_name(request)}',
+        'canonical_path': reverse('kb:settings'),
+    })
+
+
+@superuser_required
+def feedback(request):
+    """Every "Was this helpful?" vote on this KB, newest first — by
+    default only the ones that came with a comment, since those are the
+    ones worth reading one by one."""
+    ratings = Rating.objects.filter(article__org_id=PLATFORM_ORG_ID)
+    show_all = request.GET.get('all') == '1'
+    listed = ratings if show_all else ratings.exclude(comment='')
+    listed = listed.select_related('article').order_by('-created_at', '-id')
+    page_obj = Paginator(listed, 50).get_page(request.GET.get('page'))
+
+    # Rating.user_id is a bare integer, not a FK, so resolve names in
+    # one query for the page rather than one per row.
+    page_obj.object_list = list(page_obj.object_list)
+    users = get_user_model().objects.in_bulk({r.user_id for r in page_obj.object_list if r.user_id})
+    for rating in page_obj.object_list:
+        user = users.get(rating.user_id)
+        rating.reader = (user.get_full_name() or user.email or user.username) if user else ''
+
+    return render(request, 'kb/feedback.html', {
+        'page_obj': page_obj,
+        'show_all': show_all,
+        'helpful_total': ratings.filter(is_helpful=True).count(),
+        'not_helpful_total': ratings.filter(is_helpful=False).count(),
+        'comment_total': ratings.exclude(comment='').count(),
+        'meta_title': f'Feedback — {_site_name(request)}',
+        'canonical_path': reverse('kb:feedback'),
+    })
 
 
 def robots_txt(request):

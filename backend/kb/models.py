@@ -317,6 +317,9 @@ class ArticlePhoto(models.Model):
         super().save(*args, **kwargs)
 
 
+RATING_COMMENT_MAX_LENGTH = 1000
+
+
 class Rating(models.Model):
     """'Was this helpful?' — one per (user_id, article) for logged-in
     readers to prevent repeat voting; a lighter cookie-based token for
@@ -330,6 +333,9 @@ class Rating(models.Model):
         help_text='Random token stored in a long-lived cookie for anonymous readers.',
     )
     is_helpful = models.BooleanField()
+    # Optional free text the reader can add straight after voting
+    # (views.rate_comment). One per vote, never overwritten.
+    comment = models.TextField(blank=True, max_length=RATING_COMMENT_MAX_LENGTH)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -407,3 +413,35 @@ class ProductShowcase(models.Model):
             if processed is not None:
                 self.screenshot.save(processed.name, processed, save=False)
         super().save(*args, **kwargs)
+
+
+class KBSettings(models.Model):
+    """Superuser-editable switches for the KB's reader feedback
+    (views.kb_settings). A singleton: always pk=1, fetched via load().
+    Both default to on, which is how the KB behaved before this existed."""
+    ratings_enabled = models.BooleanField(
+        default=True,
+        verbose_name='Ask "Was this article helpful?" on articles',
+        help_text='Off hides the Yes/No buttons and the comment box, and stops new votes. '
+                  'Existing feedback is kept.',
+    )
+    show_helpful_count = models.BooleanField(
+        default=True,
+        verbose_name='Show "X found this helpful" on article cards',
+    )
+
+    class Meta:
+        verbose_name = 'KB settings'
+        verbose_name_plural = 'KB settings'
+
+    def __str__(self):
+        return 'KB settings'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

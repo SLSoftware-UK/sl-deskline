@@ -123,8 +123,9 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Rating)
 class RatingAdmin(admin.ModelAdmin):
-    list_display = ['article', 'is_helpful', 'user_id', 'anon_token', 'created_at']
+    list_display = ['article', 'is_helpful', 'comment', 'user_id', 'anon_token', 'created_at']
     list_filter = ['is_helpful']
+    search_fields = ['comment', 'article__title']
     readonly_fields = [f.name for f in Rating._meta.fields]
 
     def has_add_permission(self, request):

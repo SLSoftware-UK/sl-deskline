@@ -67,7 +67,7 @@ On Windows PowerShell, set the variable first: `$env:DEBUG = "True"; python mana
 
 - Articles grouped into **categories** and labelled with **tags**. The home page shows one section per category (its newest 6 articles plus a "See all" link); any search, category or tag filter switches to a flat list paginated at 12. Categories are ordered by an editable sort order, then by name.
 - **Search**: stemmed full-text search across title, summary and body, with title matches ranked above summary above body and every word required. On SQLite it uses an FTS5 index (Porter stemming, bm25 column weights 1.0 / 0.4 / 0.2), kept in sync automatically and rebuildable with `python manage.py rebuild_search_index`. On Postgres it uses Postgres full-text search with the same weighting. A SQLite build without FTS5 falls back to a simple substring match.
-- **Ratings**: "Was this helpful?" on every article, open to anonymous readers. One vote per article per reader, keyed to the account when signed in and to a cookie otherwise.
+- **Ratings**: "Was this helpful?" on every article, open to anonymous readers. One vote per article per reader, keyed to the account when signed in and to a cookie otherwise. Readers can add an optional comment after voting; admins can switch ratings and the helpful count off, and read comments at `/feedback/` (see [Reader feedback](#reader-feedback)).
 - **Members-only categories**: a category can be `public` or `members`. Members-only articles are hidden from listings, navigation, the featured slot and the sitemap, and 404 on a direct URL, unless the reader is signed in and belongs to at least one organisation, or is a support agent.
 - **SEO**: per-article meta description, canonical URLs, Open Graph tags, `sitemap.xml` (members-only articles excluded), a host-aware `robots.txt`, and schema.org `HowTo` structured data for articles with numbered steps.
 - **Authoring**: an in-app Markdown editor with live preview (`/articles/new/`, `/articles/manage/`) and category/tag management at `/taxonomy/`, for superusers. Drag-and-drop image uploads are resized, EXIF-stripped and re-encoded rather than cropped. Articles can also carry numbered how-to steps and photos (edited in Django Admin), and Django Admin handles featured articles and product showcase cards.
@@ -83,6 +83,15 @@ On Windows PowerShell, set the variable first: `$env:DEBUG = "True"; python mana
 - **Email notifications**: customers get a confirmation when they raise a ticket, plus emails for agent replies and resolution; agents get emails for new tickets, customer replies and assignments. Sent over SMTP by default, or through SMTP2GO's HTTPS API for hosts that block outbound SMTP.
 
 Not built: attachments on ticket messages.
+
+## Reader feedback
+
+Each article ends with "Was this article helpful?" 👍 / 👎. Once a reader votes, the buttons are replaced by an optional "Anything to add?" box (up to 1,000 characters). The comment is saved on that reader's own vote, and only once.
+
+Superusers get two sidebar pages:
+
+- **Settings** (`/settings/`, `kb.models.KBSettings`, a single row): switch the rating widget off (this also refuses new votes; existing ones are kept) and hide "X found this helpful" on article cards. Both are on by default.
+- **Feedback** (`/feedback/`): 👍/👎 totals, then every vote that has a comment, newest first, showing the article and who left it (or Anonymous). "All votes" also shows the votes without a comment. Ratings are also in Django Admin, where comments are searchable.
 
 ## Authentication
 

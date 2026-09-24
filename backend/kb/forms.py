@@ -25,7 +25,11 @@ from .models import Article, Category, Tag, KBSettings
 class ArticleForm(forms.ModelForm):
     class Meta:
         model = Article
-        fields = ['title', 'category', 'tags', 'sort_order', 'summary', 'body', 'meta_description', 'status']
+        fields = [
+            'title', 'category', 'tags', 'sort_order', 'summary',
+            'youtube_video_id', 'video_display',
+            'body', 'meta_description', 'status',
+        ]
         widgets = {
             'tags': forms.SelectMultiple(attrs={'size': 6}),
             'summary': forms.Textarea(attrs={'rows': 3}),
@@ -42,6 +46,15 @@ class ArticleForm(forms.ModelForm):
         self.fields['category'].empty_label = None if self.fields['category'].queryset.exists() else 'No categories yet'
         self.fields['title'].widget.attrs.setdefault('autofocus', True)
         self.fields['meta_description'].widget.attrs.setdefault('maxlength', 160)
+        self.fields['youtube_video_id'].widget.attrs.setdefault(
+            'placeholder', 'https://www.youtube.com/watch?v=…',
+        )
+        # Only matters when there's a video; a POST that omits it (older
+        # clients, tests) falls back to the model default instead of failing.
+        self.fields['video_display'].required = False
+
+    def clean_video_display(self):
+        return self.cleaned_data.get('video_display') or Article.VIDEO_DISPLAY_EMBED
 
 
 class CategoryForm(forms.ModelForm):

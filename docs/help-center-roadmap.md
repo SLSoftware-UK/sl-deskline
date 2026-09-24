@@ -132,6 +132,19 @@ deliberately the simpler option at this scale:
 - PostgreSQL (optional, via `DATABASE_URL`): `django.contrib.postgres.search`.
 - A SQLite build without FTS5: a plain `icontains` fallback, unstemmed.
 
+## Supporting video (shipped 2026-09-24)
+
+One optional YouTube video per article, entered in its own field between Summary and Body
+rather than as a shortcode or raw HTML inside the Markdown — the body's bleach allowlist
+deliberately keeps stripping `<iframe>`, so authors can't frame arbitrary sites. Only the
+11-character video ID is stored (`kb/youtube.py` parses watch/youtu.be/Shorts/embed/live links);
+every URL is rebuilt from it. Three display modes: embedded player (youtube-nocookie.com, no
+cookies until play), thumbnail linking out (i.ytimg.com), or a "Watch on YouTube" button. CSP
+widened by exactly those two hosts. The iframe carries
+`referrerpolicy="strict-origin-when-cross-origin"` because Django's default
+`Referrer-Policy: same-origin` would otherwise strip the Referer and YouTube refuses to play
+(Error 153).
+
 ## Roadmap
 
 1. **Done** — public KB, search, ratings, superuser authoring, members-only categories,

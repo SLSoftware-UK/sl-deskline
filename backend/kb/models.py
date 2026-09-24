@@ -30,8 +30,10 @@ from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from markdownx.models import MarkdownxField
 
+from . import youtube
 from .markdown_utils import render_markdown
 from .validators import validate_image_size
+from .youtube import YouTubeVideoIdField
 
 
 class Category(models.Model):
@@ -165,6 +167,27 @@ class Article(models.Model):
         help_text='Short standalone summary of what this article covers — '
                    'shown in listings and used as a search-result snippet.',
     )
+    # Optional supporting video, shown between the summary and the body.
+    # A dedicated field rather than anything inside `body` -- see
+    # kb/youtube.py for why (bleach strips iframes from the body, and
+    # only a bare video ID is ever stored).
+    VIDEO_DISPLAY_EMBED = 'embed'
+    VIDEO_DISPLAY_THUMBNAIL = 'thumbnail'
+    VIDEO_DISPLAY_BUTTON = 'button'
+    VIDEO_DISPLAY_CHOICES = [
+        (VIDEO_DISPLAY_EMBED, 'Embedded player'),
+        (VIDEO_DISPLAY_THUMBNAIL, 'Thumbnail linking to YouTube'),
+        (VIDEO_DISPLAY_BUTTON, '"Watch on YouTube" button'),
+    ]
+    youtube_video_id = YouTubeVideoIdField(
+        'YouTube video', blank=True, default='',
+        help_text='Optional. Paste the video\u2019s YouTube link (or its ID).',
+    )
+    video_display = models.CharField(
+        'Show video as', max_length=10,
+        choices=VIDEO_DISPLAY_CHOICES, default=VIDEO_DISPLAY_EMBED,
+    )
+
     # Markdown source — MarkdownxField is a plain TextField at the DB
     # level (same column type as before) with a live-preview editor
     # widget in Django Admin (see kb/admin.py, kb/markdown_utils.py).
@@ -255,6 +278,18 @@ class Article(models.Model):
         cached on write, since this is low-traffic content, not a
         hot path worth the cache-invalidation complexity."""
         return mark_safe(render_markdown(self.body))
+
+    @property
+    def youtube_embed_url(self):
+        return youtube.embed_url(self.youtube_video_id) if self.youtube_video_id else ''
+
+    @property
+    def youtube_watch_url(self):
+        return youtube.watch_url(self.youtube_video_id) if self.youtube_video_id else ''
+
+    @property
+    def youtube_thumbnail_url(self):
+        return youtube.thumbnail_url(self.youtube_video_id) if self.youtube_video_id else ''
 
     @property
     def helpful_count(self):

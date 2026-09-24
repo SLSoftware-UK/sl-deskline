@@ -69,6 +69,25 @@
       {% if form.summary.errors %}<p class="field-error">{{ form.summary.errors|join:", " }}</p>{% endif %}
     </div>
 
+    <div class="field-row">
+      <div class="field {% if form.youtube_video_id.errors %}has-error{% endif %}">
+        {{ form.youtube_video_id.label_tag }}
+        {{ form.youtube_video_id }}
+        <p class="field-hint">
+          Optional — a video that backs up this article, shown between the summary and the body.
+          Paste any YouTube link (watch, youtu.be, Shorts or embed) or the bare video ID.
+          Leave blank for no video.
+        </p>
+        {% if form.youtube_video_id.errors %}<p class="field-error">{{ form.youtube_video_id.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        {{ form.video_display.label_tag }}
+        {{ form.video_display }}
+        <p class="field-hint">Player plays in the page; thumbnail and button open YouTube in a new tab.</p>
+      </div>
+    </div>
+
     <div class="field">
       {{ form.body.label_tag }}
       {{ form.body }}

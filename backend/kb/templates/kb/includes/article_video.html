@@ -1,0 +1,34 @@
+{% comment %}
+Optional supporting video between the summary and body — see kb/youtube.py.
+Every URL here is built from the stored 11-character ID; the hosts match the
+CSP in support_core/security_middleware.py (frame-src youtube-nocookie.com,
+img-src i.ytimg.com).
+
+referrerpolicy on the iframe is required, not cosmetic: Django's
+SecurityMiddleware sends Referrer-Policy: same-origin, which strips the
+Referer on cross-origin requests, and YouTube refuses to play embeds that
+arrive without one (player "Error 153"). The attribute overrides the
+page-level policy for this one frame only.
+{% endcomment %}
+<section class="article-video article-video--{{ article.video_display }}">
+{% if article.video_display == "thumbnail" %}
+  <a class="video-thumb" href="{{ article.youtube_watch_url }}" target="_blank" rel="noopener">
+    <img src="{{ article.youtube_thumbnail_url }}" alt="" loading="lazy">
+    <span class="video-play" aria-hidden="true"></span>
+    <span class="visually-hidden">Watch the video for “{{ article.title }}” on YouTube (opens in a new tab)</span>
+  </a>
+{% elif article.video_display == "button" %}
+  <a class="btn-nav video-button" href="{{ article.youtube_watch_url }}" target="_blank" rel="noopener">
+    <span class="video-button-icon" aria-hidden="true">▶</span> Watch the video on YouTube
+  </a>
+{% else %}
+  <div class="video-frame">
+    <iframe src="{{ article.youtube_embed_url }}"
+            title="Video: {{ article.title }}"
+            loading="lazy"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen></iframe>
+  </div>
+{% endif %}
+</section>

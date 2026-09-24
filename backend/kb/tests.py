@@ -22,8 +22,10 @@ from accounts.models import Membership, Organisation
 from kb.context_processors import help_url, tickets_url
 from kb.image_cleanup import purge_orphaned_markdown_images
 from kb.models import Article, ArticlePhoto, ArticleStep, Category, FeaturedArticle
+from kb.forms import ArticleForm
 from kb.validators import validate_image_size
 from kb.views import ARTICLES_PER_CATEGORY_ON_HOME, ARTICLES_PER_PAGE, absolute_media_url
+from kb.youtube import extract_video_id
 
 
 class AuthoringSidebarTests(TestCase):
@@ -1330,3 +1332,124 @@ class RatingSettingsAndFeedbackTests(TestCase):
         rating = self.article.ratings.get()
         self.assertIsNone(rating.user_id)
         self.assertEqual(rating.comment, 'Great, thanks')
+
+
+VID = 'dQw4w9WgXcQ'
+
+
+class ExtractVideoIdTests(TestCase):
+    def test_accepts_common_link_shapes(self):
+        for value in [
+            VID,
+            f'https://www.youtube.com/watch?v={VID}',
+            f'https://youtube.com/watch?v={VID}&t=42s&list=PL123',
+            f'https://m.youtube.com/watch?v={VID}',
+            f'youtube.com/watch?v={VID}',
+            f'https://youtu.be/{VID}',
+            f'https://youtu.be/{VID}?si=abc&t=10',
+            f'https://www.youtube.com/shorts/{VID}',
+            f'https://www.youtube.com/embed/{VID}',
+            f'https://www.youtube-nocookie.com/embed/{VID}',
+            f'https://www.youtube.com/live/{VID}',
+            f'  {VID}  ',
+        ]:
+            with self.subTest(value=value):
+                self.assertEqual(extract_video_id(value), VID)
+
+    def test_rejects_non_youtube_or_malformed(self):
+        for value in [
+            '', 'hello', f'https://evil.example/watch?v={VID}',
+            f'https://youtube.com.evil.example/watch?v={VID}',
+            'https://www.youtube.com/watch?v=short',
+            f'javascript:alert(1)//{VID}',
+            'https://www.youtube.com/channel/UCabcdefghijk',
+            f'<iframe src="https://www.youtube.com/embed/{VID}"></iframe>',
+        ]:
+            with self.subTest(value=value):
+                self.assertIsNone(extract_video_id(value))
+
+
+class ArticleVideoTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(org_id=None, name='Getting started')
+
+    def _form(self, **overrides):
+        data = {
+            'title': 'Booking a class', 'category': self.category.pk,
+            'summary': 'How to book.', 'body': '', 'meta_description': '',
+            'status': Article.STATUS_DRAFT, 'youtube_video_id': '',
+            'video_display': Article.VIDEO_DISPLAY_EMBED,
+        }
+        data.update(overrides)
+        return ArticleForm(data=data)
+
+    def test_form_normalises_pasted_url_to_id(self):
+        form = self._form(youtube_video_id=f'https://youtu.be/{VID}?si=x')
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['youtube_video_id'], VID)
+
+    def test_form_rejects_non_youtube_link(self):
+        form = self._form(youtube_video_id='https://vimeo.com/123456')
+        self.assertFalse(form.is_valid())
+        self.assertIn('youtube_video_id', form.errors)
+
+    def test_form_video_is_optional(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['youtube_video_id'], '')
+
+    def test_form_missing_display_mode_defaults_to_embed(self):
+        form = self._form()
+        form.data = {k: v for k, v in form.data.items() if k != 'video_display'}
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['video_display'], Article.VIDEO_DISPLAY_EMBED)
+
+    def _article(self, **kwargs):
+        return Article.objects.create(
+            org_id=None, title='Booking a class', category=self.category, summary='How to book.',
+            status=Article.STATUS_PUBLISHED, published_at=timezone.now(),
+            author_user_id=1, author_display_name='Ed', **kwargs,
+        )
+
+    def _detail(self, article):
+        resp = self.client.get(reverse('kb:article-detail', args=[article.slug]))
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    def test_no_video_renders_no_video_section(self):
+        html = self._detail(self._article()).content.decode()
+        self.assertNotIn('article-video', html)
+
+    def test_embed_mode(self):
+        html = self._detail(self._article(youtube_video_id=VID)).content.decode()
+        self.assertIn(f'src="https://www.youtube-nocookie.com/embed/{VID}"', html)
+        self.assertIn('referrerpolicy="strict-origin-when-cross-origin"', html)
+        # Sits between the summary and the body.
+        self.assertLess(html.index('class="summary"'), html.index('article-video'))
+
+    def test_thumbnail_mode(self):
+        html = self._detail(self._article(
+            youtube_video_id=VID, video_display=Article.VIDEO_DISPLAY_THUMBNAIL,
+        )).content.decode()
+        self.assertIn(f'https://i.ytimg.com/vi/{VID}/hqdefault.jpg', html)
+        self.assertIn(f'href="https://www.youtube.com/watch?v={VID}"', html)
+        self.assertNotIn('<iframe', html)
+
+    def test_button_mode(self):
+        html = self._detail(self._article(
+            youtube_video_id=VID, video_display=Article.VIDEO_DISPLAY_BUTTON,
+        )).content.decode()
+        self.assertIn('Watch the video on YouTube', html)
+        self.assertIn(f'href="https://www.youtube.com/watch?v={VID}"', html)
+        self.assertNotIn('<iframe', html)
+        self.assertNotIn('i.ytimg.com/vi/', html)
+
+    def test_csp_allows_only_the_youtube_hosts_used(self):
+        csp = self._detail(self._article(youtube_video_id=VID))['Content-Security-Policy']
+        self.assertIn('frame-src https://www.youtube-nocookie.com;', csp)
+        self.assertIn('https://i.ytimg.com', csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+
+    def test_body_still_strips_raw_iframes(self):
+        article = self._article(body=f'<iframe src="https://www.youtube.com/embed/{VID}"></iframe>')
+        self.assertNotIn('<iframe', str(article.body_html))

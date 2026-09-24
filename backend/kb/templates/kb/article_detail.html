@@ -29,6 +29,9 @@
   <section class="summary">
     <p>{{ article.summary|linebreaksbr }}</p>
   </section>
+  {% if article.youtube_video_id %}
+    {% include "kb/includes/article_video.html" %}
+  {% endif %}
 
   {% if article.body %}
   <section class="body">

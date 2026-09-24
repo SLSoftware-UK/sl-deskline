@@ -22,6 +22,14 @@ the templates):
     this app's own origin. That failure is easy to miss: images simply
     stop rendering, with the reason visible only in the browser console.
 
+Article supporting videos (kb/youtube.py) need exactly two more hosts,
+and nothing wider: frame-src allows only YouTube's privacy-enhanced
+embed domain (www.youtube-nocookie.com -- the only host the templates
+ever frame), and img-src adds i.ytimg.com for "thumbnail" display mode.
+The player's own scripts/requests run inside the youtube-nocookie
+frame's origin, governed by YouTube's policy, not this one, so
+script-src/connect-src don't need to change.
+
 frame-ancestors 'none' is the CSP-level equivalent of X-Frame-Options
 and takes precedence in modern browsers.
 """
@@ -41,9 +49,9 @@ class SecurityHeadersMiddleware:
             "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data:; "
+            "img-src 'self' data: https://i.ytimg.com; "
             "connect-src 'self'; "
-            "frame-src 'none'; "
+            "frame-src https://www.youtube-nocookie.com; "
             "object-src 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "

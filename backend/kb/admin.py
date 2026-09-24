@@ -69,7 +69,7 @@ class ArticleAdmin(MarkdownxModelAdmin):
             'fields': ('title', 'slug', 'status', 'org_id', 'category', 'sort_order', 'tags'),
         }),
         ('Content', {
-            'fields': ('summary', 'body'),
+            'fields': ('summary', 'youtube_video_id', 'video_display', 'body'),
         }),
         ('SEO', {
             'fields': ('meta_description',),

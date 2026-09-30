@@ -26,6 +26,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from markdownx.settings import MARKDOWNX_MEDIA_PATH
@@ -754,6 +755,26 @@ def article_create(request):
     return render(request, 'kb/article_form.html', context)
 
 
+def _edit_return_url(request, article):
+    """Where article_edit sends the author after Save / Cancel: back to the
+    article they came from (the "Edit this article" bar on the public page
+    passes ?next=), otherwise the Manage list. `next` is only honoured when
+    it is a same-host path, and a draft has no public page to return to
+    (article_detail 404s it), so it falls back to Manage."""
+    manage = reverse('kb:article-manage')
+    target = request.POST.get('next') or request.GET.get('next') or ''
+    if (
+        target
+        and article.status == Article.STATUS_PUBLISHED
+        and url_has_allowed_host_and_scheme(
+            target, allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+    ):
+        return target
+    return manage
+
+
 @superuser_required
 def article_edit(request, slug):
     article = get_object_or_404(Article, slug=slug, org_id=PLATFORM_ORG_ID)
@@ -768,7 +789,7 @@ def article_edit(request, slug):
             form.save_m2m()
             deleted_images = purge_orphaned_markdown_images()
             messages.success(request, f'"{article.title}" saved.{_cleanup_suffix(deleted_images)}')
-            return redirect('kb:article-manage')
+            return redirect(_edit_return_url(request, article))
         messages.error(request, 'Please fix the errors below.')
     else:
         form = ArticleForm(instance=article)
@@ -777,6 +798,8 @@ def article_edit(request, slug):
         'form': form,
         'is_new': False,
         'article': article,
+        'return_url': _edit_return_url(request, article),
+        'next_param': request.POST.get('next') or request.GET.get('next') or '',
         'meta_title': f'Editing — {article.title} — {_site_name(request)}',
         'canonical_path': reverse('kb:article-edit', args=[article.slug]),
     }

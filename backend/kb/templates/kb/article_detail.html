@@ -17,6 +17,13 @@
 
 {% block content %}
 <article class="article-detail">
+  {% if user.is_superuser %}
+  {% url 'kb:article-detail' article.slug as detail_url %}
+  <div class="edit-bar">
+    <a class="btn-nav" href="{% url 'kb:article-edit' article.slug %}?next={{ detail_url|urlencode:'' }}">&#9998; Edit this article</a>
+    <span class="edit-bar-hint">Only you can see this bar.</span>
+  </div>
+  {% endif %}
   <nav class="breadcrumb"><a href="{% url 'kb:article-list' %}">Help</a> / {{ article.category.name }} / {{ article.title }}</nav>
 
   <h1>{{ article.title }}</h1>

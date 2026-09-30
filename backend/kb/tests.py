@@ -1453,3 +1453,61 @@ class ArticleVideoTests(TestCase):
     def test_body_still_strips_raw_iframes(self):
         article = self._article(body=f'<iframe src="https://www.youtube.com/embed/{VID}"></iframe>')
         self.assertNotIn('<iframe', str(article.body_html))
+
+
+class EditFromArticlePageTests(TestCase):
+    """Superusers get an "Edit this article" bar on the public article
+    page; saving from it returns to the article, not the Manage list."""
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.boss = User.objects.create_superuser('boss', 'boss@example.com', 'pw')
+        cls.agent = User.objects.create_user('agent', 'agent@example.com', 'pw', is_staff=True)
+        cls.category = Category.objects.create(org_id=None, name='Getting Started')
+        cls.article = _make_article(cls.category, 'Add a member', 'add-a-member')
+        cls.detail_url = reverse('kb:article-detail', args=['add-a-member'])
+        cls.edit_url = reverse('kb:article-edit', args=['add-a-member'])
+
+    def _post(self, **extra):
+        data = {
+            'title': 'Add a member', 'category': self.category.pk, 'sort_order': '',
+            'summary': 'Summary.', 'body': 'Body copy.', 'status': Article.STATUS_PUBLISHED,
+            'video_display': self.article.video_display,
+        }
+        data.update(extra)
+        return self.client.post(self.edit_url, data)
+
+    def test_bar_shown_to_superuser_only(self):
+        self.assertNotContains(self.client.get(self.detail_url), 'Edit this article')
+        self.client.force_login(self.agent)
+        self.assertNotContains(self.client.get(self.detail_url), 'Edit this article')
+        self.client.force_login(self.boss)
+        response = self.client.get(self.detail_url)
+        self.assertContains(response, 'Edit this article')
+        self.assertContains(response, f'{self.edit_url}?next=%2Farticles%2Fadd-a-member%2F')
+
+    def test_save_returns_to_the_article(self):
+        self.client.force_login(self.boss)
+        response = self._post(next=self.detail_url)
+        self.assertRedirects(response, self.detail_url)
+
+    def test_save_without_next_still_goes_to_manage(self):
+        self.client.force_login(self.boss)
+        self.assertRedirects(self._post(), reverse('kb:article-manage'))
+
+    def test_external_next_is_ignored(self):
+        self.client.force_login(self.boss)
+        response = self._post(next='https://evil.example.com/')
+        self.assertRedirects(response, reverse('kb:article-manage'))
+
+    def test_unpublishing_falls_back_to_manage(self):
+        self.client.force_login(self.boss)
+        response = self._post(next=self.detail_url, status=Article.STATUS_DRAFT)
+        self.assertRedirects(response, reverse('kb:article-manage'))
+
+    def test_edit_form_carries_next_and_cancel_returns_to_article(self):
+        self.client.force_login(self.boss)
+        response = self.client.get(self.edit_url, {'next': self.detail_url})
+        self.assertContains(response, f'name="next" value="{self.detail_url}"')
+        self.assertContains(response, f'href="{self.detail_url}" class="btn-nav btn-nav-secondary">Cancel')

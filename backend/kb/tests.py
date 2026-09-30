@@ -1511,3 +1511,31 @@ class EditFromArticlePageTests(TestCase):
         response = self.client.get(self.edit_url, {'next': self.detail_url})
         self.assertContains(response, f'name="next" value="{self.detail_url}"')
         self.assertContains(response, f'href="{self.detail_url}" class="btn-nav btn-nav-secondary">Cancel')
+
+
+class CardVideoFlagTests(TestCase):
+    """Superuser-only "has a video" marker on home-page article cards."""
+
+    def setUp(self):
+        self.category = Category.objects.create(org_id=None, name='Getting started')
+
+    def _article(self, title, **kwargs):
+        return Article.objects.create(
+            org_id=None, title=title, category=self.category, summary='Summary.',
+            status=Article.STATUS_PUBLISHED, published_at=timezone.now(),
+            author_user_id=1, author_display_name='Ed', **kwargs,
+        )
+
+    def _home(self):
+        return self.client.get(reverse('kb:article-list')).content.decode()
+
+    def test_superuser_sees_flag_only_on_cards_with_video(self):
+        self._article('With video', youtube_video_id=VID)
+        self._article('Without video')
+        get_user_model().objects.create_superuser('ed', 'ed@example.com', 'pw')
+        self.client.login(username='ed', password='pw')
+        self.assertEqual(self._home().count('class="video-flag"'), 1)
+
+    def test_anonymous_never_sees_flag(self):
+        self._article('With video', youtube_video_id=VID)
+        self.assertNotIn('video-flag"', self._home())

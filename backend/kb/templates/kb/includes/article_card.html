@@ -4,4 +4,5 @@
   <h3>{{ article.title }}</h3>
   <p>{{ article.summary|truncatewords:24 }}</p>
   {% if KB_SETTINGS.show_helpful_count %}<span class="meta">{{ article.helpful_count }} found this helpful</span>{% endif %}
+  {% include "kb/includes/video_flag.html" %}
 </a>

@@ -165,6 +165,12 @@ a { color: var(--accent); }
 }
 .article-card .meta { display: block; margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
 .article-card.featured { background: var(--accent-tint); border-color: var(--accent-light); }
+.article-card { position: relative; }
+.article-card:has(.video-flag) { padding-bottom: 46px; }
+.article-card .video-flag {
+  position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-dark);
+}
 
 /* Home page: one section per category (kb/views.py::article_list). */
 .category-section { margin-top: 32px; }

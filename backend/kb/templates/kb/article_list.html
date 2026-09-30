@@ -13,6 +13,7 @@
   <a class="article-card featured" href="{% url 'kb:article-detail' featured.article.slug %}">
     <h3>{{ featured.article.title }}</h3>
     <p>{{ featured.article.summary|truncatewords:30 }}</p>
+    {% include "kb/includes/video_flag.html" with article=featured.article %}
   </a>
 </section>
 {% endif %}
